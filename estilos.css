@@ -1,0 +1,80 @@
+body{
+	width:115%;
+	background-color: #4F4F4F;
+	text-align: center;
+	color: white;
+}
+#tabela{
+        display: inline-block;
+   	width: 97%; 
+	background-color: #363636;
+	padding: 1%;	
+}
+#busca{
+	width: 30%;
+}
+button{
+	padding: 2%;
+	color: white;
+	background-color: gray;
+}
+#enviar{
+	color: white;
+	background-color: gray;
+	border: 1px solid black;
+	padding: 2px;
+}
+a{
+	color: white;
+	text-decoration: none;
+}
+ #barramenu{
+	position: fixed;
+	left: 1%;
+ 	top: 1%;
+	height: 5%;
+} 
+#barramenu button a:hover{
+	background-color: white;
+	color: gray;
+} 
+#submenu{
+	position: absolute;	
+	display: none;
+	width:20%;
+	left:2px;
+	z-index: 1;
+}
+table {
+	 margin: auto;
+ 	display: inline-block;
+	 border: 3px solid gray;
+	 border-collapse: collapse;
+	 background-color: black;
+}
+.title{
+	background-color: gray;
+	color: white;
+}
+.title:hover{
+	background-color: white;
+	color: black;
+}
+table th{
+ 	background-color: white;
+	border: 3px solid black;
+	color: gray;
+}
+table th:hover{
+	background-color: gray;
+	color: white;
+}
+.formulario th, input{
+	width: 100%;
+}
+img{
+	position: absolute;
+	top: 2%;
+ 	left:25%;
+	width:5%; 
+}
