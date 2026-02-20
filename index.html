@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>CRUD Excel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+  <img id="logoImg" class="logo">
+  <nav>
+    <button onclick="mostrar('dados')">CadastroMatMed</button>
+    <button onclick="mostrar('saidas')">DarSaida</button>
+    <button onclick="mostrar('config')">Configurar</button>
+  </nav>
+</div>
+
+
+<h1>Crud Excel</h1>
+
+
+<!-- ================= DADOS ================= -->
+<section id="dados" class="active">
+  <h2>Cadastros</h2>
+
+ <button class="secondary" onclick="adicionarLinha()">➕ Novo cadastro</button>
+
+
+  <div id="tabela"></div>
+</section>
+
+<!-- ================= CONFIG ================= -->
+<section id="config">
+  <h2>Configurações</h2>
+<h3>Logo do sistema</h3>
+
+<input id="logoUrl" placeholder="URL da logo">
+<button onclick="salvarLogoURL()">Salvar logo por URL</button>
+
+<br><br>
+
+<input type="file" accept="image/*"
+  onchange="salvarLogoArquivo(this.files[0])">
+
+  <h3>Importar planilha</h3>
+  <input type="file" id="fileInput" accept=".xlsx,.xls">
+
+  <h3>Exportar planilha</h3>
+  <button onclick="exportarExcel()">📤 Exportar Excel</button>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
