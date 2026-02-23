@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Sistema Rio Branco</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<div class="menu-overlay"></div>
+<header class="topo">
+<img id="logoSistema" class="logo">
+<h1>Sistema RioBranco</h1>
+</header>
+
+<nav class="menu">
+<div class="menu-item active" onclick="showTab('dashboard',this)">Dashboard</div>
+<div class="menu-item" onclick="showTab('fretes',this)">Fretes</div>
+<div class="menu-item" onclick="showTab('cargas',this)">Cargas</div>
+<div class="menu-item" onclick="showTab('cadastros',this)">Cadastros</div>
+<div class="menu-item" onclick="showTab('devolucoes',this)">Devoluções</div>
+<div class="menu-item" onclick="showTab('gestaofrota',this)">Gestão Frota</div>
+<div class="menu-item" onclick="showTab('config',this)">Config</div>
+</nav>
+
+<!-- DASHBOARD -->
+<section id="dashboard" class="section activeSection">
+<div class="dashBox">Iniciar: <span id="d1"></span></div>
+<div class="dashBox">Em andamento: <span id="d2"></span></div>
+<div class="dashBox">Aguardando contagem: <span id="d3"></span></div>
+<div class="dashBox">Finalizado: <span id="d4"></span></div>
+</section>
+
+<!-- FRETES -->
+<section id="fretes" class="section">
+<button onclick="novoFrete()">Novo Frete</button>
+<div class="kanban">
+<div class="col" data-status="Iniciar"></div>
+<div class="col" data-status="Em andamento"></div>
+<div class="col" data-status="Aguardando contagem"></div>
+<div class="col" data-status="Finalizado"></div>
+</div>
+</section>
+
+<!-- CARGAS -->
+<section id="cargas" class="section">
+<h3>Cadastrar Carga</h3>
+<input id="nomeCarga">
+<button onclick="criarCarga()">Adicionar</button>
+<ul id="listaCargas"></ul>
+</section>
+
+<!-- CADASTROS -->
+<section id="cadastros" class="section">
+<h3>Motoristas</h3>
+<button onclick="addCadastro('motoristas')">Adicionar</button>
+<ul id="listaMotoristas"></ul>
+
+<h3>Veículos</h3>
+<button onclick="addCadastro('veiculos')">Adicionar</button>
+<ul id="listaVeiculos"></ul>
+
+<h3>Conferentes</h3>
+<button onclick="addCadastro('conferentes')">Adicionar</button>
+<ul id="listaConferentes"></ul>
+</section>
+
+<!-- DEVOLUÇÕES -->
+<section id="devolucoes" class="section">
+<h3>Nova Devolução</h3>
+
+<div class="formDev">
+<div>
+Frete:
+<select id="dev_frete"></select>
+
+Nº:
+<input id="dev_numero">
+
+Veículo:
+<select id="dev_veiculo"></select>
+
+Conferente:
+<select id="dev_conf"></select>
+</div>
+
+<div>
+600ml:
+<input id="dev_600" type="number">
+
+200 C24:
+<input id="dev_c24" type="number">
+
+200 C48:
+<input id="dev_c48" type="number">
+
+PET 2L:
+<input id="dev_pet2l" type="number">
+
+PET 600:
+<input id="dev_pet600" type="number">
+
+PET 200:
+<input id="dev_pet200" type="number">
+</div>
+</div>
+
+<button onclick="addDevolucao()">Lançar Devolução</button>
+
+<hr>
+
+<table>
+<thead>
+<tr>
+<th>Frete</th>
+<th>Nº</th>
+<th>Veículo</th>
+<th>600ml</th>
+<th>200 C24</th>
+<th>200 C48</th>
+<th>PET 2L</th>
+<th>PET 600</th>
+<th>PET 200</th>
+<th>Conf</th>
+</tr>
+</thead>
+<tbody id="devTable"></tbody>
+</table>
+</section>
+
+<!-- GESTÃO DE FROTA -->
+<section id="gestaofrota" class="section">
+
+<h2>🚛 Gestão de Frota</h2>
+
+<div class="frotaGrid">
+<button onclick="gerarRelatorioFrota()">📄 Gerar Relatório</button>
+
+<!-- CADASTRO VEÍCULO -->
+<div class="boxFrota">
+<h3>Novo Veículo</h3>
+<input id="frota_placa" placeholder="Placa">
+<input id="frota_modelo" placeholder="Modelo">
+<input id="frota_km" type="number" placeholder="KM Atual">
+<button onclick="addVeiculoFrota()">Cadastrar Veículo</button>
+</div>
+
+<!-- MANUTENÇÃO -->
+<div class="boxFrota">
+<h3>Registrar Manutenção</h3>
+<select id="manut_veiculo"></select>
+<input id="manut_tipo" placeholder="Ex: Freio, Motor, Suspensão">
+<input id="manut_km" type="number" placeholder="KM da Manutenção">
+<input id="manut_valor" type="number" placeholder="Valor R$">
+<button onclick="addManutencao()">Salvar Manutenção</button>
+</div>
+
+<!-- TROCA DE ÓLEO -->
+<div class="boxFrota">
+<h3>Troca de Óleo</h3>
+<select id="oleo_veiculo"></select>
+<input id="oleo_km" type="number" placeholder="KM da Troca">
+<input id="oleo_tipo" placeholder="Tipo de Óleo">
+<button onclick="addTrocaOleo()">Registrar Troca</button>
+</div>
+
+</div>
+
+<hr>
+
+<h3>📋 Veículos da Frota</h3>
+<table>
+<thead>
+<tr>
+<th>Placa</th>
+<th>Modelo</th>
+<th>KM</th>
+<th>Últ. Óleo</th>
+<th>Manutenções</th>
+<th>Custo Total</th>
+
+</tr>
+</thead>
+<tbody id="tabelaFrota"></tbody>
+</table>
+
+</section>
+
+<!-- CONFIG -->
+<section id="config" class="section">
+<h3>Logo</h3>
+<input id="logo_url" placeholder="logo.png ou URL">
+<button onclick="salvarLogo()">Salvar Logo</button>
+<h3>Status do Banco</h3>
+<div id="statusBD" style="font-weight:bold;">Verificando...</div>
+<button onclick="verificarStatusBD()">Testar Conexão</button>
+<h3>MySQL</h3>
+<input id="db_host" placeholder="Host">
+<input id="db_port" placeholder="Porta">
+<input id="db_name" placeholder="Banco">
+<input id="db_user" placeholder="Usuário">
+<input id="db_pass" placeholder="Senha">
+<button onclick="salvarDBConfig()">Salvar DB</button>
+
+<hr>
+<button onclick="exportar()">Exportar Backup</button>
+<button onclick="importar()">Importar Backup</button>
+</section>
+
+<script src="script.js"></script>
+</body>
+</html>

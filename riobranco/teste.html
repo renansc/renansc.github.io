@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Sistema Rio Branco</title>
+
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+<style>
+	body{
+font-family:'Oswald',sans-serif;
+margin:0;
+background:#f4f6f9;
+color:#333;
+}
+
+/* TOPO */
+.topo{
+display:flex;
+align-items:center;
+gap:15px;
+padding:10px 20px;
+background:#fff;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+.logo{
+height:60px;
+display:none;
+}
+
+/* MENU */
+.menu{
+display:flex;
+background:#ff9800;
+color:#fff;
+}
+
+.menu-item{
+padding:12px 18px;
+cursor:pointer;
+}
+
+.menu-item:hover{background:#e68900;}
+.menu-item.active{background:#c66900;}
+
+/* SEÇÕES */
+.section{display:none;padding:20px;}
+.activeSection{display:block;}
+
+/* DASHBOARD */
+.dashBox{
+display:inline-block;
+background:#fff;
+padding:15px;
+margin:10px;
+border-radius:6px;
+box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+
+/* KANBAN */
+.kanban{
+display:flex;
+gap:15px;
+margin-top:10px;
+}
+
+.col{
+flex:1;
+background:#eaeef3;
+padding:10px;
+border-radius:6px;
+min-height:300px;
+}
+
+.col h3{text-align:center;}
+
+.card{
+background:#fff;
+padding:8px;
+border-radius:5px;
+margin-bottom:8px;
+box-shadow:0 1px 4px rgba(0,0,0,.1);
+cursor:grab;
+transition:.2s;
+}
+
+.card:active{cursor:grabbing;transform:scale(1.02);}
+
+.card input{
+width:95%;
+margin-bottom:4px;
+}
+
+.details{
+display:none;
+margin-top:5px;
+background:#fff3e0;
+padding:5px;
+border-radius:4px;
+font-size:13px;
+}
+
+.details input{width:90%;}
+
+/* LISTAS */
+ul{list-style:none;padding:0;}
+li{
+background:#fff;
+padding:6px;
+margin-bottom:4px;
+border-radius:4px;
+box-shadow:0 1px 3px rgba(0,0,0,.1);
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+li input{width:70%;}
+
+/* FORM DEVOLUÇÕES */
+.formDev{
+display:flex;
+gap:40px;
+margin-bottom:10px;
+}
+
+.formDev div{flex:1;}
+
+.formDev input,.formDev select{
+width:100%;
+margin-bottom:6px;
+padding:5px;
+}
+
+/* TABELA */
+table{
+width:100%;
+border-collapse:collapse;
+background:#fff;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:6px;
+text-align:center;
+}
+
+th{background:#ff9800;color:#fff;}
+
+/* BOTÕES */
+button{
+background:#ff9800;
+color:#fff;
+border:none;
+padding:6px 10px;
+border-radius:4px;
+cursor:pointer;
+}
+
+button:hover{background:#e68900;}
+
+input,select{
+border:1px solid #ccc;
+border-radius:4px;
+padding:5px;
+}
+</style>
+</head>
+
+<body>
+
+<header class="topo">
+<img id="logoSistema" class="logo">
+<h1>Sistema RioBranco</h1>
+</header>
+
+<nav class="menu">
+<div class="menu-item active" onclick="showTab('dashboard',this)">Dashboard</div>
+<div class="menu-item" onclick="showTab('fretes',this)">Fretes</div>
+<div class="menu-item" onclick="showTab('cargas',this)">Cargas</div>
+<div class="menu-item" onclick="showTab('cadastros',this)">Cadastros</div>
+<div class="menu-item" onclick="showTab('devolucoes',this)">Devoluções</div>
+<div class="menu-item" onclick="showTab('config',this)">Config</div>
+</nav>
+
+<!-- DASHBOARD -->
+<section id="dashboard" class="section activeSection">
+<div class="dashBox">Iniciar: <span id="d1"></span></div>
+<div class="dashBox">Em andamento: <span id="d2"></span></div>
+<div class="dashBox">Aguardando contagem: <span id="d3"></span></div>
+<div class="dashBox">Finalizado: <span id="d4"></span></div>
+</section>
+
+<!-- FRETES -->
+<section id="fretes" class="section">
+<button onclick="novoFrete()">Novo Frete</button>
+<div class="kanban">
+<div class="col" data-status="Iniciar"></div>
+<div class="col" data-status="Em andamento"></div>
+<div class="col" data-status="Aguardando contagem"></div>
+<div class="col" data-status="Finalizado"></div>
+</div>
+</section>
+
+<!-- CARGAS -->
+<section id="cargas" class="section">
+<h3>Cadastrar Carga</h3>
+<input id="nomeCarga">
+<button onclick="criarCarga()">Adicionar</button>
+<ul id="listaCargas"></ul>
+</section>
+
+<!-- CADASTROS -->
+<section id="cadastros" class="section">
+<h3>Motoristas</h3>
+<button onclick="addCadastro('motoristas')">Adicionar</button>
+<ul id="listaMotoristas"></ul>
+
+<h3>Veículos</h3>
+<button onclick="addCadastro('veiculos')">Adicionar</button>
+<ul id="listaVeiculos"></ul>
+
+<h3>Conferentes</h3>
+<button onclick="addCadastro('conferentes')">Adicionar</button>
+<ul id="listaConferentes"></ul>
+</section>
+
+<!-- DEVOLUÇÕES -->
+<section id="devolucoes" class="section">
+<h3>Nova Devolução</h3>
+
+<div class="formDev">
+<div>
+Frete:
+<select id="dev_frete"></select>
+
+Nº:
+<input id="dev_numero">
+
+Veículo:
+<select id="dev_veiculo"></select>
+
+Conferente:
+<select id="dev_conf"></select>
+</div>
+
+<div>
+600ml:
+<input id="dev_600" type="number">
+
+200 C24:
+<input id="dev_c24" type="number">
+
+200 C48:
+<input id="dev_c48" type="number">
+
+PET 2L:
+<input id="dev_pet2l" type="number">
+
+PET 600:
+<input id="dev_pet600" type="number">
+
+PET 200:
+<input id="dev_pet200" type="number">
+</div>
+</div>
+
+<button onclick="addDevolucao()">Lançar Devolução</button>
+
+<hr>
+
+<table>
+<thead>
+<tr>
+<th>Frete</th>
+<th>Nº</th>
+<th>Veículo</th>
+<th>600ml</th>
+<th>200 C24</th>
+<th>200 C48</th>
+<th>PET 2L</th>
+<th>PET 600</th>
+<th>PET 200</th>
+<th>Conf</th>
+</tr>
+</thead>
+<tbody id="devTable"></tbody>
+</table>
+</section>
+
+<!-- CONFIG -->
+<section id="config" class="section">
+<h3>Logo</h3>
+<input id="logo_url" placeholder="logo.png ou URL">
+<button onclick="salvarLogo()">Salvar Logo</button>
+
+<h3>MySQL</h3>
+<input id="db_host" placeholder="Host">
+<input id="db_port" placeholder="Porta">
+<input id="db_name" placeholder="Banco">
+<input id="db_user" placeholder="Usuário">
+<input id="db_pass" placeholder="Senha">
+<button onclick="salvarDBConfig()">Salvar DB</button>
+
+<hr>
+<button onclick="exportar()">Exportar Backup</button>
+<button onclick="importar()">Importar Backup</button>
+</section>
+
+<script>
+	let dados={
+fretes:[],cargas:[],devolucoes:[],
+motoristas:[],veiculos:[],conferentes:[],
+config:{mysql:{host:"",port:"3306",db:"",user:"",pass:""},logo:""}
+};
+
+let idFrete=1,idCarga=1;
+
+function salvar(){localStorage.setItem('frota',JSON.stringify(dados));}
+
+function garantirEstrutura(){
+if(!dados.config) dados.config={};
+if(!dados.config.mysql) dados.config.mysql={host:"",port:"3306",db:"",user:"",pass:""};
+if(!dados.config.logo) dados.config.logo="";
+}
+
+// ---------------- LOGO ----------------
+function salvarLogo(){
+let valor = logo_url.value.trim().split("?")[0];
+dados.config.logo = valor;
+salvar();
+aplicarLogo();
+}
+
+function aplicarLogo(){
+garantirEstrutura();
+let img=document.getElementById("logoSistema");
+if(!img)return;
+let logo=dados.config.logo;
+if(!logo){img.style.display="none";return;}
+img.src=logo+"?v="+Date.now();
+img.style.display="block";
+img.onerror=()=>img.style.display="none";
+}
+
+// ---------------- MYSQL ----------------
+function salvarDBConfig(){
+dados.config.mysql={host:db_host.value,port:db_port.value,db:db_name.value,user:db_user.value,pass:db_pass.value};
+salvar();
+alert("Configuração salva!");
+}
+
+// ---------------- TABS ----------------
+function showTab(tab,el){
+document.querySelectorAll('.section').forEach(s=>s.classList.remove('activeSection'));
+document.getElementById(tab).classList.add('activeSection');
+document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('active'));
+el.classList.add('active');
+}
+
+// ---------------- CARGAS ----------------
+function criarCarga(){
+if(!nomeCarga.value)return;
+dados.cargas.push({id:idCarga++,nome:nomeCarga.value});
+nomeCarga.value='';
+salvar();
+renderCargas();
+}
+
+function renderCargas(){
+listaCargas.innerHTML=dados.cargas.map((c,i)=>`
+<li>
+<input value="${c.nome}" onchange="editCarga(${i},this.value)">
+<button onclick="delCarga(${i})">X</button>
+</li>`).join('');
+}
+
+function editCarga(i,v){dados.cargas[i].nome=v;salvar();}
+function delCarga(i){dados.cargas.splice(i,1);salvar();renderCargas();}
+
+// ---------------- CADASTROS ----------------
+function addCadastro(tipo){
+let nome=prompt("Nome:");
+if(!nome)return;
+dados[tipo].push(nome);
+salvar();
+renderCadastros();
+}
+
+function renderLista(tipo,el){
+el.innerHTML=dados[tipo].map((n,i)=>`
+<li>
+<input value="${n}" onchange="editCadastro('${tipo}',${i},this.value)">
+<button onclick="delCadastro('${tipo}',${i})">X</button>
+</li>`).join('');
+}
+
+function renderCadastros(){
+renderLista('motoristas',listaMotoristas);
+renderLista('veiculos',listaVeiculos);
+renderLista('conferentes',listaConferentes);
+}
+
+function editCadastro(t,i,v){dados[t][i]=v;salvar();}
+function delCadastro(t,i){dados[t].splice(i,1);salvar();renderCadastros();}
+
+// ---------------- FRETES (KANBAN) ----------------
+function novoFrete(){
+let nome=prompt("Descrição do frete:");
+if(!nome)return;
+
+dados.fretes.push({
+id:idFrete++,
+nome,
+motorista:"",
+veiculo:"",
+carga:"",
+status:"Iniciar"
+});
+salvar();
+renderFretes();
+}
+
+function renderFretes(){
+document.querySelectorAll('.col').forEach(col=>{
+let st=col.dataset.status;
+col.innerHTML="<h3>"+st+"</h3>";
+
+col.ondragover=e=>e.preventDefault();
+col.ondrop=e=>{
+let id=e.dataTransfer.getData("id");
+let f=dados.fretes.find(x=>x.id==id);
+if(f){f.status=st;salvar();renderFretes();}
+};
+
+dados.fretes.filter(f=>f.status===st).forEach(f=>{
+let c=document.createElement('div');
+c.className="card";
+c.draggable=true;
+c.ondragstart=e=>e.dataTransfer.setData("id",f.id);
+c.onclick=()=>toggleDetalhes(f.id);
+
+c.innerHTML=`
+<input value="${f.nome}" onchange="editarFrete(${f.id},'nome',this.value)">
+<div class="details" id="det-${f.id}">
+Motorista:
+<input value="${f.motorista||''}" onchange="editarFrete(${f.id},'motorista',this.value)"><br>
+Veículo:
+<input value="${f.veiculo||''}" onchange="editarFrete(${f.id},'veiculo',this.value)"><br>
+Carga:
+<input value="${f.carga||''}" onchange="editarFrete(${f.id},'carga',this.value)">
+</div>`;
+
+col.appendChild(c);
+});
+});
+atualizarDash();
+}
+
+function editarFrete(id,campo,valor){
+let f=dados.fretes.find(x=>x.id===id);
+if(!f)return;
+f[campo]=valor;
+salvar();
+}
+
+function atualizarSelectFretes(){
+if(!dev_frete) return;
+dev_frete.innerHTML = dados.fretes
+.map(f=>`<option value="${f.nome}">${f.nome}</option>`)
+.join('');
+}
+
+function toggleDetalhes(id){
+let d=document.getElementById("det-"+id);
+if(!d)return;
+d.style.display=d.style.display==="block"?"none":"block";
+}
+
+// ---------------- DASHBOARD ----------------
+function atualizarDash(){
+d1.textContent=dados.fretes.filter(f=>f.status==="Iniciar").length;
+d2.textContent=dados.fretes.filter(f=>f.status==="Em andamento").length;
+d3.textContent=dados.fretes.filter(f=>f.status==="Aguardando contagem").length;
+d4.textContent=dados.fretes.filter(f=>f.status==="Finalizado").length;
+}
+
+function addDevolucao(){
+let dev={
+frete: dev_frete.value,
+numero: dev_numero.value,
+veiculo: dev_veiculo.value,
+
+p600: dev_600.value,
+c24: dev_c24.value,
+c48: dev_c48.value,
+
+pet2l: dev_pet2l.value,
+pet600: dev_pet600.value,
+pet200: dev_pet200.value,
+
+conf: dev_conf.value
+};
+
+dados.devolucoes.push(dev);
+salvar();
+renderDev();
+
+dev_numero.value="";
+dev_600.value="";
+dev_c24.value="";
+dev_c48.value="";
+dev_pet2l.value="";
+dev_pet600.value="";
+dev_pet200.value="";
+}
+
+
+function atualizarSelectsDevolucao(){
+dev_frete.innerHTML=dados.fretes.map(f=>`<option>${f.nome}</option>`).join('');
+dev_veiculo.innerHTML=dados.veiculos.map(v=>`<option>${v}</option>`).join('');
+dev_conf.innerHTML=dados.conferentes.map(c=>`<option>${c}</option>`).join('');
+}
+
+
+// ---------------- DEVOLUÇÕES ----------------
+function renderDev(){
+devTable.innerHTML=dados.devolucoes.map((d,i)=>`
+<tr>
+<td>${d.frete}</td>
+<td>${d.numero}</td>
+<td>${d.veiculo}</td>
+
+<td>${d.p600||0}</td>
+<td>${d.c24||0}</td>
+<td>${d.c48||0}</td>
+
+<td>${d.pet2l||0}</td>
+<td>${d.pet600||0}</td>
+<td>${d.pet200||0}</td>
+
+<td>${d.conf}</td>
+</tr>`).join('');
+}
+
+
+
+function editDev(i,campo,valor){
+dados.devolucoes[i][campo]=valor;
+salvar();
+}
+
+// ---------------- BACKUP ----------------
+function exportar(){
+let a=document.createElement('a');
+a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(dados));
+a.download='backup_frota.json';
+a.click();
+}
+
+function importar(){
+let i=document.createElement('input');
+i.type='file';
+i.onchange=e=>{
+let r=new FileReader();
+r.onload=()=>{
+dados=JSON.parse(r.result);
+garantirEstrutura();
+salvar();
+initSistema();
+};
+r.readAsText(e.target.files[0]);
+};
+i.click();
+}
+
+// ---------------- INIT ----------------
+function initSistema(){
+atualizarSelectFretes();
+garantirEstrutura();
+atualizarSelectsDevolucao();
+
+
+logo_url.value=dados.config.logo||"";
+db_host.value=dados.config.mysql.host||"";
+db_port.value=dados.config.mysql.port||"";
+db_name.value=dados.config.mysql.db||"";
+db_user.value=dados.config.mysql.user||"";
+db_pass.value=dados.config.mysql.pass||"";
+
+renderCargas();
+renderCadastros();
+renderFretes();
+renderDev();
+setTimeout(aplicarLogo,300);
+}
+
+window.onload=()=>{
+let ls=localStorage.getItem('frota');
+if(ls) dados=JSON.parse(ls);
+initSistema();
+};
+
+	
+</script>
+</body>
+</html>
