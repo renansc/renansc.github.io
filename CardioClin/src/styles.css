@@ -288,6 +288,25 @@ th {
   display: none;
 }
 
+.panel-screen .current-call-alert.show {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  min-width: 360px;
+  max-width: 80vw;
+  text-align: center;
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  display: block;
+  animation: toastIn 0.2s ease-out;
+}
+
 @keyframes toastIn {
   from {
     opacity: 0;

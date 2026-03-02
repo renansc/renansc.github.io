@@ -103,7 +103,10 @@ function parseYoutubeEmbed(url) {
     }
 
     if (!id) return null;
-    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}&rel=0&modestbranding=1`;
+    const originParam = /^https?:/i.test(window.location.protocol)
+      ? `&origin=${encodeURIComponent(window.location.origin)}`
+      : "";
+    return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}&rel=0&modestbranding=1${originParam}`;
   } catch {
     return null;
   }
@@ -132,6 +135,9 @@ function applyPanelVideo() {
   }
 
   if (youtubeEmbed) {
+    if (window.location.protocol === "file:") {
+      showConfigMessage("YouTube pode falhar no arquivo local (erro 153). Abra o sistema via http://localhost.", true);
+    }
     frame.src = youtubeEmbed;
     frame.style.display = "block";
     localVideo.pause();
@@ -158,8 +164,8 @@ function updateFullscreenButton() {
 
 function announceCall(call) {
   if (!("speechSynthesis" in window)) return;
-  const place = call.destination || "consultorio";
-  const text = `Paciente ${call.name}, por favor dirigir-se ao ${place}.`;
+  const place = call.destination || "consultório";
+  const text = `Paciente ${call.name}, por favor dirigir-se a ${place}.`;
 
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
@@ -175,11 +181,13 @@ function showCurrentCallAlert(call, prefix = "Chamada atual") {
   const title = byId("currentCallAlertTitle");
   const place = byId("currentCallAlertPlace");
   const time = byId("currentCallAlertTime");
-  if (!alert || !title || !place || !time || !isPanelFullscreen()) return;
+  const panel = byId("painel");
+  const panelVisible = panel && panel.classList.contains("active");
+  if (!alert || !title || !place || !time || (!isPanelFullscreen() && !panelVisible)) return;
 
   time.textContent = `${prefix} - ${new Date(call.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
   title.textContent = `Senha ${call.ticket} - ${call.name}`;
-  place.textContent = `Dirigir-se ao ${call.destination || "consultorio"}`;
+  place.textContent = `Dirigir-se a ${call.destination || "consultório"}`;
 
   alert.classList.remove("show");
   void alert.offsetWidth;
@@ -193,7 +201,7 @@ function showCurrentCallAlert(call, prefix = "Chamada atual") {
 
 function getSelectedDestination(patientId) {
   const sel = document.querySelector(`select[data-destination-id="${patientId}"]`);
-  return sel ? sel.value : "consultorio";
+  return sel ? sel.value : "consultório";
 }
 
 function renderFullscreenHistory() {
@@ -203,7 +211,7 @@ function renderFullscreenHistory() {
   list.innerHTML = "";
   state.calls.slice(0, 8).forEach((c) => {
     const li = document.createElement("li");
-    li.textContent = `${new Date(c.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - Senha ${c.ticket} (${c.name}) -> ${c.destination || "consultorio"}`;
+    li.textContent = `${new Date(c.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - Senha ${c.ticket} (${c.name}) -> ${c.destination || "consultório"}`;
     list.appendChild(li);
   });
 }
@@ -442,7 +450,11 @@ function renderAppointments() {
   const table = byId("appointmentsTable");
   table.innerHTML = "";
 
-  state.patients
+  state.patients.forEach((p) => {
+    if (!p.id) p.id = crypto.randomUUID();
+  });
+
+  [...state.patients]
     .sort((a, b) => a.ticket - b.ticket)
     .forEach((p) => {
       const tr = document.createElement("tr");
@@ -452,10 +464,10 @@ function renderAppointments() {
         <td>${new Date(p.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
         <td><span class="status ${p.status}">${p.status === "waiting" ? "Aguardando" : p.status === "called" ? "Chamado" : "Finalizado"}</span></td>
         <td>
-          <select data-destination-id="${p.id}">
-            <option value="consultorio">Consultorio</option>
-            <option value="sala de medicacao">Sala de medicacao</option>
-            <option value="recepcao">Recepcao</option>
+          <select data-destination data-destination-id="${p.id}">
+            <option value="consultório">Consultório</option>
+            <option value="sala de medicação">Sala de medicação</option>
+            <option value="recepção">Recepção</option>
           </select>
         </td>
         <td>
@@ -473,7 +485,8 @@ function renderAppointments() {
       if (!target) return;
 
       if (btn.dataset.action === "call") {
-        const destination = getSelectedDestination(id);
+        const destination =
+          btn.closest("tr")?.querySelector("select[data-destination]")?.value || getSelectedDestination(id);
         target.status = "called";
         const call = {
           id: crypto.randomUUID(),
@@ -485,6 +498,7 @@ function renderAppointments() {
         state.calls.unshift(call);
         state.calls = state.calls.slice(0, 15);
         announceCall(call);
+        showCurrentCallAlert(call);
       } else {
         target.status = "done";
       }
@@ -498,7 +512,7 @@ function renderAppointments() {
 function renderPanel() {
   const last = state.calls[0];
   byId("lastCall").textContent = last
-    ? `Senha ${last.ticket} - ${last.name} -> ${last.destination || "consultorio"}`
+    ? `Senha ${last.ticket} - ${last.name} -> ${last.destination || "consultório"}`
     : "Nenhuma chamada realizada";
 
   const panelQueue = byId("panelQueue");
@@ -517,7 +531,7 @@ function renderPanel() {
   called.innerHTML = "";
   state.calls.slice(0, 8).forEach((c) => {
     const li = document.createElement("li");
-    li.textContent = `${new Date(c.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - Senha ${c.ticket} (${c.name}) -> ${c.destination || "consultorio"}`;
+    li.textContent = `${new Date(c.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - Senha ${c.ticket} (${c.name}) -> ${c.destination || "consultório"}`;
     called.appendChild(li);
   });
 
@@ -692,6 +706,17 @@ function init() {
   bindForms();
   bindConfig();
   bindPanel();
+  window.addEventListener("storage", (e) => {
+    if (!e.key || !e.key.startsWith("cc_")) return;
+    state.patients = JSON.parse(localStorage.getItem("cc_patients") || "[]");
+    state.calls = JSON.parse(localStorage.getItem("cc_calls") || "[]");
+    state.stock = JSON.parse(localStorage.getItem("cc_stock") || "[]");
+    state.finance = JSON.parse(localStorage.getItem("cc_finance") || "[]");
+    state.ticket = Number(localStorage.getItem("cc_ticket") || 0);
+    state.panelVideoUrl = localStorage.getItem("cc_panel_video_url") || "";
+    renderAll();
+    applyPanelVideo();
+  });
   renderTabs();
   renderAll();
 }
