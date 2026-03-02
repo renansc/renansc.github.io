@@ -25,6 +25,7 @@
     <button class="tab-btn" data-tab="estoque">Estoque</button>
     <button class="tab-btn" data-tab="financeiro">Financeiro</button>
     <button class="tab-btn" data-tab="relatorios">Relatórios</button>
+    <button class="tab-btn" data-tab="config">Config</button>
   </nav>
 
   <main>
@@ -61,6 +62,7 @@
               <th>Paciente</th>
               <th>Chegada</th>
               <th>Status</th>
+              <th>Local</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -70,20 +72,47 @@
     </section>
 
     <section id="painel" class="tab-content panel-screen">
-      <h2>Painel de Chamadas</h2>
-      <div class="panel-box">
-        <p>Última chamada</p>
-        <h3 id="lastCall">Nenhuma chamada realizada</h3>
+      <div class="panel-header">
+        <h2>Painel de Chamadas</h2>
+        <button id="panelFullscreenBtn" class="btn primary" type="button">Tela cheia</button>
       </div>
-      <div class="panel-grid">
-        <div class="card">
-          <h3>Próximos da fila</h3>
-          <ul id="panelQueue" class="list"></ul>
+
+      <div id="panelVideoLayer" class="panel-video-layer" aria-hidden="true">
+        <iframe
+          id="panelVideoFrame"
+          title="Vídeo do painel"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+        <video id="panelVideoLocal" muted loop playsinline></video>
+      </div>
+
+      <div class="panel-content">
+        <div class="panel-box">
+          <p>Última chamada</p>
+          <h3 id="lastCall">Nenhuma chamada realizada</h3>
         </div>
-        <div class="card">
-          <h3>Chamados recentemente</h3>
-          <ul id="calledHistory" class="list"></ul>
+        <div class="panel-grid">
+          <div class="card">
+            <h3>Próximos da fila</h3>
+            <ul id="panelQueue" class="list"></ul>
+          </div>
+          <div class="card">
+            <h3>Chamados recentemente</h3>
+            <ul id="calledHistory" class="list"></ul>
+          </div>
         </div>
+      </div>
+
+      <div id="fullscreenHistoryPopup" class="fullscreen-history-popup">
+        <h3>Histórico</h3>
+        <ul id="fullscreenHistoryList" class="list"></ul>
+      </div>
+      <div id="currentCallAlert" class="current-call-alert">
+        <p id="currentCallAlertTime"></p>
+        <h3 id="currentCallAlertTitle"></h3>
+        <strong id="currentCallAlertPlace"></strong>
       </div>
     </section>
 
@@ -154,6 +183,51 @@
       <div class="card">
         <ul class="list" id="reportsList"></ul>
       </div>
+    </section>
+
+    <section id="config" class="tab-content">
+      <h2>Configuração e Importação</h2>
+
+      <div class="card">
+        <h3>Backup completo (JSON)</h3>
+        <p>Exporta e importa todo o estado do sistema: pacientes, chamadas, estoque, financeiro e senha atual.</p>
+        <div class="config-actions">
+          <button id="exportConfigBtn" class="btn primary" type="button">Exportar JSON</button>
+          <label class="btn file-btn" for="importConfigFile">Selecionar JSON</label>
+          <input id="importConfigFile" type="file" accept=".json,application/json" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Vídeo do Painel de Chamadas</h3>
+        <p>Informe um link YouTube (normal/short) ou URL local (ex.: <code>assets/video.mp4</code>).</p>
+        <div class="config-actions">
+          <input id="panelVideoUrlInput" type="text" placeholder="https://www.youtube.com/watch?v=..." />
+          <button id="savePanelVideoBtn" class="btn primary" type="button">Salvar link do vídeo</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Importar estoque por JSON</h3>
+        <p>Formato esperado: array com <code>item</code>, <code>lote</code>, <code>quantidade</code> e <code>validade</code> (AAAA-MM-DD).</p>
+        <textarea id="stockJsonInput" class="config-textarea" placeholder='[{"item":"Seringa 10ml","lote":"A12","quantidade":50,"validade":"2026-10-15"}]'></textarea>
+        <div class="config-actions">
+          <button id="importStockJsonBtn" class="btn primary" type="button">Importar JSON no estoque</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Converter planilha para JSON</h3>
+        <p>Cole dados CSV/TSV com cabeçalhos como: item, lote, quantidade, validade.</p>
+        <textarea id="spreadsheetInput" class="config-textarea" placeholder="item;lote;quantidade;validade&#10;Seringa 10ml;A12;50;2026-10-15"></textarea>
+        <div class="config-actions">
+          <button id="convertSpreadsheetBtn" class="btn" type="button">Converter para JSON</button>
+          <button id="importSpreadsheetBtn" class="btn primary" type="button">Converter e importar</button>
+        </div>
+        <pre id="spreadsheetJsonOutput" class="json-output"></pre>
+      </div>
+
+      <p id="configMessage" class="config-message"></p>
     </section>
   </main>
 
