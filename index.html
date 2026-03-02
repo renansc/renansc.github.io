@@ -1,60 +1,35 @@
-<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>CRUD Excel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Renan SC | Portal de Aplicativos</title>
+  <meta name="description" content="Acesso rápido aos aplicativos GPS Musical, Financeiro Nanotech e CardioClin." />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">RC</div>
+      <div>
+        <h1>Renan SC - Portal de Aplicativos</h1>
+        <p>Menu principal para acessar seus sistemas</p>
+      </div>
+    </div>
+    <nav aria-label="Menu principal">
+      <ul class="menu" id="menuLinks"></ul>
+    </nav>
+  </header>
 
-<div class="header">
-  <img id="logoImg" class="logo">
-  <nav>
-    <button onclick="mostrar('dados')">CadastroMatMed</button>
-    <button onclick="mostrar('saidas')">DarSaida</button>
-    <button onclick="mostrar('config')">Configurar</button>
-    <a href="/riobranco/index.html">Teste</a>
+  <main class="container">
+    <section class="hero card">
+      <h2>Aplicativos disponíveis</h2>
+      <p>Escolha um aplicativo para abrir diretamente.</p>
+    </section>
 
-  </nav>
-</div>
+    <section class="apps-grid" id="appsGrid" aria-label="Lista de aplicativos"></section>
+  </main>
 
-
-<h1>Crud Excel</h1>
-
-
-<!-- ================= DADOS ================= -->
-<section id="dados" class="active">
-  <h2>Cadastros</h2>
-
- <button class="secondary" onclick="adicionarLinha()">➕ Novo cadastro</button>
-
-
-  <div id="tabela"></div>
-</section>
-
-<!-- ================= CONFIG ================= -->
-<section id="config">
-  <h2>Configurações</h2>
-<h3>Logo do sistema</h3>
-
-<input id="logoUrl" placeholder="URL da logo">
-<button onclick="salvarLogoURL()">Salvar logo por URL</button>
-
-<br><br>
-
-<input type="file" accept="image/*"
-  onchange="salvarLogoArquivo(this.files[0])">
-
-  <h3>Importar planilha</h3>
-  <input type="file" id="fileInput" accept=".xlsx,.xls">
-
-  <h3>Exportar planilha</h3>
-  <button onclick="exportarExcel()">📤 Exportar Excel</button>
-</section>
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
-
