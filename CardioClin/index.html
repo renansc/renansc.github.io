@@ -1,0 +1,162 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioClin - Sistema de Gestão</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="logo.png" alt="Logo CardioClin" class="logo" />
+      <div>
+        <h1>CardioClin</h1>
+        <p>Sistema de Gestão da Clínica Cardiológica</p>
+      </div>
+    </div>
+    <div class="date" id="currentDate"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="recepcao">Recepção</button>
+    <button class="tab-btn" data-tab="atendimentos">Atendimentos</button>
+    <button class="tab-btn" data-tab="painel">Painel de Chamadas</button>
+    <button class="tab-btn" data-tab="estoque">Estoque</button>
+    <button class="tab-btn" data-tab="financeiro">Financeiro</button>
+    <button class="tab-btn" data-tab="relatorios">Relatórios</button>
+  </nav>
+
+  <main>
+    <section id="recepcao" class="tab-content active">
+      <h2>Recepção e Cadastro</h2>
+      <form id="patientForm" class="grid-form">
+        <input required name="nome" placeholder="Nome do paciente" />
+        <input required name="cpf" placeholder="CPF" />
+        <input required name="telefone" placeholder="Telefone" />
+        <select required name="convenio">
+          <option value="">Convênio</option>
+          <option>Particular</option>
+          <option>Unimed</option>
+          <option>Bradesco Saúde</option>
+          <option>SulAmérica</option>
+        </select>
+        <textarea required name="queixa" placeholder="Queixa principal"></textarea>
+        <button type="submit">Cadastrar e Entrar na Fila</button>
+      </form>
+      <div class="card">
+        <h3>Pacientes aguardando</h3>
+        <ul id="queueList" class="list"></ul>
+      </div>
+    </section>
+
+    <section id="atendimentos" class="tab-content">
+      <h2>Gestão de Atendimentos</h2>
+      <div class="card">
+        <h3>Fila de atendimento</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Senha</th>
+              <th>Paciente</th>
+              <th>Chegada</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="appointmentsTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="painel" class="tab-content panel-screen">
+      <h2>Painel de Chamadas</h2>
+      <div class="panel-box">
+        <p>Última chamada</p>
+        <h3 id="lastCall">Nenhuma chamada realizada</h3>
+      </div>
+      <div class="panel-grid">
+        <div class="card">
+          <h3>Próximos da fila</h3>
+          <ul id="panelQueue" class="list"></ul>
+        </div>
+        <div class="card">
+          <h3>Chamados recentemente</h3>
+          <ul id="calledHistory" class="list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="estoque" class="tab-content">
+      <h2>Estoque com Lote e Validade</h2>
+      <form id="stockForm" class="grid-form">
+        <input required name="item" placeholder="Item" />
+        <input required name="lote" placeholder="Lote" />
+        <input required name="quantidade" type="number" min="1" placeholder="Quantidade" />
+        <input required name="validade" type="date" />
+        <button type="submit">Adicionar ao estoque</button>
+      </form>
+      <div class="card">
+        <h3>Itens em estoque</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Lote</th>
+              <th>Qtd.</th>
+              <th>Validade</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="stockTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="financeiro" class="tab-content">
+      <h2>Financeiro</h2>
+      <form id="financeForm" class="grid-form">
+        <select required name="tipo">
+          <option value="">Tipo</option>
+          <option value="receita">Receita</option>
+          <option value="despesa">Despesa</option>
+        </select>
+        <input required name="descricao" placeholder="Descrição" />
+        <input required name="valor" type="number" step="0.01" min="0" placeholder="Valor" />
+        <input required name="vencimento" type="date" />
+        <button type="submit">Lançar</button>
+      </form>
+      <div class="summary">
+        <div class="card kpi"><p>Receitas</p><h3 id="kpiRevenue">R$ 0,00</h3></div>
+        <div class="card kpi"><p>Despesas</p><h3 id="kpiExpense">R$ 0,00</h3></div>
+        <div class="card kpi"><p>Saldo</p><h3 id="kpiBalance">R$ 0,00</h3></div>
+      </div>
+      <div class="card">
+        <h3>Lançamentos</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Descrição</th>
+              <th>Valor</th>
+              <th>Vencimento</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="financeTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="relatorios" class="tab-content">
+      <h2>Relatórios Rápidos</h2>
+      <div class="card">
+        <ul class="list" id="reportsList"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="src/app.js"></script>
+</body>
+</html>
