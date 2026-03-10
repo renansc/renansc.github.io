@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/*
+!data/.gitkeep
+*Zone.Identifier*
+__pycache__/
+*.py[cod]
+.venv/

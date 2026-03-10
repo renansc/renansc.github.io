@@ -1,0 +1,1271 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+from dotenv import load_dotenv
+from flask import Flask, abort, jsonify, request, send_from_directory
+from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, delete, inspect, select, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from werkzeug.exceptions import HTTPException
+
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+STORE_SITE = "site"
+STORE_GPS = "gps-musical"
+STORE_FINANCE = "financeiro-nanotech"
+SUPPORTED_STORES = {STORE_SITE, STORE_GPS, STORE_FINANCE}
+
+DEFAULT_SITE_APPS = [
+    {
+        "slug": "gps-musical",
+        "nome": "GPS Musical",
+        "descricao": "Gerencie repertorio, letras e blocos musicais.",
+        "href": "GPSMusical/gpsmusical.html",
+    },
+    {
+        "slug": "financeiro-nanotech",
+        "nome": "Financeiro Nanotech",
+        "descricao": "Controle de lancamentos, contas, categorias e conciliacao.",
+        "href": "FinanceiroNanotech/financeiro.html",
+    },
+]
+
+
+class AppError(Exception):
+    def __init__(self, status_code: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_bool(value: str | None, fallback: bool = False) -> bool:
+    if value is None or str(value).strip() == "":
+        return fallback
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def parse_size(value: str | None) -> int | None:
+    if value is None or str(value).strip() == "":
+        return None
+
+    normalized = str(value).strip().lower()
+    units = {"gb": 1024**3, "mb": 1024**2, "kb": 1024, "b": 1}
+
+    for suffix, factor in units.items():
+        if normalized.endswith(suffix):
+            amount = float(normalized[: -len(suffix)].strip())
+            return int(amount * factor)
+
+    return int(normalized)
+
+
+def normalize_provider(value: str | None) -> str:
+    provider = str(value or "sqlite").strip().lower()
+    aliases = {
+        "postgresql": "postgres",
+        "mariadb": "mysql",
+        "file": "sqlite",
+    }
+    return aliases.get(provider, provider)
+
+
+def assert_store_id(store_id: str) -> str:
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", store_id or ""):
+        raise AppError(400, "Invalid store id.")
+    return store_id
+
+
+def assert_table_name(value: str | None) -> str:
+    table_name = str(value or "").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9_]+", table_name):
+        raise RuntimeError("Invalid table name.")
+    return table_name
+
+
+def normalize_database_url(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    normalized = value.strip()
+    replacements = {
+        "postgres://": "postgresql+psycopg://",
+        "postgresql://": "postgresql+psycopg://",
+        "mysql://": "mysql+pymysql://",
+        "mariadb://": "mysql+pymysql://",
+    }
+
+    for prefix, replacement in replacements.items():
+        if normalized.startswith(prefix):
+            return normalized.replace(prefix, replacement, 1)
+
+    return normalized
+
+
+def resolve_data_dir() -> Path:
+    configured = os.getenv("DATA_DIR")
+    data_dir = Path(configured).expanduser() if configured else BASE_DIR / "data"
+    if not data_dir.is_absolute():
+        data_dir = BASE_DIR / data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+def resolve_sqlite_path(value: str, data_dir: Path) -> Path:
+    sqlite_path = Path(value).expanduser() if value else data_dir / "app.db"
+    if not sqlite_path.is_absolute():
+        sqlite_path = BASE_DIR / sqlite_path
+    sqlite_path = sqlite_path.resolve()
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite_path
+
+
+def build_database_url(data_dir: Path) -> str:
+    explicit_url = normalize_database_url(os.getenv("DATABASE_URL"))
+    if explicit_url:
+        if explicit_url.startswith("sqlite:///"):
+            sqlite_path = resolve_sqlite_path(explicit_url.removeprefix("sqlite:///"), data_dir)
+            return f"sqlite:///{sqlite_path.as_posix()}"
+        return explicit_url
+
+    provider = normalize_provider(os.getenv("DB_PROVIDER", "sqlite"))
+    database_name = str(os.getenv("DB_NAME", data_dir / "app.db")).strip()
+
+    if provider == "sqlite":
+        sqlite_path = resolve_sqlite_path(database_name, data_dir)
+        return f"sqlite:///{sqlite_path.as_posix()}"
+
+    host = str(os.getenv("DB_HOST", "localhost")).strip()
+    port = str(os.getenv("DB_PORT", "")).strip()
+    username = str(os.getenv("DB_USER", "")).strip()
+    password = os.getenv("DB_PASSWORD", "")
+
+    if not database_name or not host or not username:
+        raise RuntimeError("Configure DB_NAME, DB_HOST and DB_USER in .env for SQL providers.")
+
+    encoded_user = quote(username)
+    encoded_password = quote(password) if password else ""
+    credentials = encoded_user if not encoded_password else f"{encoded_user}:{encoded_password}"
+    host_part = f"{host}:{port}" if port else host
+
+    if provider == "postgres":
+        return f"postgresql+psycopg://{credentials}@{host_part}/{quote(database_name)}"
+
+    if provider == "mysql":
+        return f"mysql+pymysql://{credentials}@{host_part}/{quote(database_name)}"
+
+    raise RuntimeError(f"Unsupported DB_PROVIDER: {provider}")
+
+
+def detect_provider(database_url: str) -> str:
+    lowered = database_url.lower()
+    if lowered.startswith("postgresql"):
+        return "postgres"
+    if lowered.startswith("mysql"):
+        return "mysql"
+    if lowered.startswith("sqlite"):
+        return "sqlite"
+    return "unknown"
+
+
+def database_label(database_url: str) -> str:
+    if database_url.startswith("sqlite:///"):
+        return database_url.removeprefix("sqlite:///")
+    return re.sub(r":[^:@/]+@", ":***@", database_url)
+
+
+def as_text(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    return str(value).strip()
+
+
+def as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def as_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
+def slugify(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_value).strip("-").lower()
+    return slug or "item"
+
+
+def unique_slug(base: str, used: set[str]) -> str:
+    slug = base
+    suffix = 2
+    while slug in used:
+        slug = f"{base}-{suffix}"
+        suffix += 1
+    used.add(slug)
+    return slug
+
+
+DATA_DIR = resolve_data_dir()
+DATABASE_URL = build_database_url(DATA_DIR)
+DB_PROVIDER = detect_provider(DATABASE_URL)
+LEGACY_STORE_TABLE = assert_table_name(os.getenv("LEGACY_STORE_TABLE", "app_stores"))
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class StoreMetadata(Base):
+    __tablename__ = "store_metadata"
+
+    store_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False, default=now_iso)
+
+
+class SiteApp(Base):
+    __tablename__ = "site_apps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    href: Mapped[str] = mapped_column(String(255), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class GpsSong(Base):
+    __tablename__ = "gps_songs"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    artist: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    song_key: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    audio_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    audio_mime: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False, default=now_iso)
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False, default=now_iso)
+
+
+class GpsSongTag(Base):
+    __tablename__ = "gps_song_tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    song_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    value: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+
+class GpsSongBlock(Base):
+    __tablename__ = "gps_song_blocks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    song_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    block_type: Mapped[str] = mapped_column(String(80), nullable=False, default="Bloco")
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    chords: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    lyrics: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    time_sec: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class FinanceConfig(Base):
+    __tablename__ = "financeiro_config"
+
+    singleton_id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    tol_dias: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    tol_valor: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    score_min: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+
+
+class FinanceAccount(Base):
+    __tablename__ = "financeiro_accounts"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    nome: Mapped[str] = mapped_column(String(255), nullable=False)
+    moeda: Mapped[str] = mapped_column(String(16), nullable=False, default="BRL")
+    saldo_inicial: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+
+class FinanceCategory(Base):
+    __tablename__ = "financeiro_categories"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    nome: Mapped[str] = mapped_column(String(255), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class FinanceTransaction(Base):
+    __tablename__ = "financeiro_transactions"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    data: Mapped[str] = mapped_column(String(16), nullable=False)
+    conta_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False)
+    categoria_id: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    descricao: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    valor: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    conciliado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    bank_tx_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
+class FinanceImport(Base):
+    __tablename__ = "financeiro_imports"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    conta_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False, default="import.ofx")
+
+
+class FinanceBankTransaction(Base):
+    __tablename__ = "financeiro_bank_transactions"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    import_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    data: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    fitid: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    memo: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    trntype: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+
+
+class FinanceReconciliation(Base):
+    __tablename__ = "financeiro_reconciliations"
+
+    bank_tx_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    lanc_id: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class FinanceTitle(Base):
+    __tablename__ = "financeiro_titles"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tipo: Mapped[str] = mapped_column(String(16), nullable=False)
+    pessoa: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    descricao: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    categoria_id: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    conta_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    valor: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    vencimento: Mapped[str] = mapped_column(String(16), nullable=False)
+    centro_custo: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    observacoes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ABERTO")
+    baixado_em: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    lanc_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    bank_tx_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
+class FinanceTitleAttachment(Base):
+    __tablename__ = "financeiro_title_attachments"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    title_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime: Mapped[str] = mapped_column(String(255), nullable=False, default="application/octet-stream")
+    data_url: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
+
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif DB_PROVIDER == "postgres" and parse_bool(os.getenv("DB_SSL"), False):
+    engine_kwargs["connect_args"] = {"sslmode": "require"}
+elif DB_PROVIDER == "mysql" and parse_bool(os.getenv("DB_SSL"), False):
+    engine_kwargs["connect_args"] = {"ssl": {}}
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+Base.metadata.create_all(engine)
+LEGACY_TABLE_AVAILABLE = inspect(engine).has_table(LEGACY_STORE_TABLE)
+
+
+def default_finance_config() -> dict[str, Any]:
+    return {"tolDias": 3, "tolValor": 0.5, "scoreMin": 60}
+
+
+def ensure_supported_store(store_id: str) -> str:
+    safe_store_id = assert_store_id(store_id)
+    if safe_store_id not in SUPPORTED_STORES:
+        raise AppError(404, "Store not found.")
+    return safe_store_id
+
+
+def store_exists(session, store_id: str) -> bool:
+    return session.get(StoreMetadata, store_id) is not None
+
+
+def touch_store(session, store_id: str) -> str:
+    timestamp = now_iso()
+    metadata = session.get(StoreMetadata, store_id)
+    if metadata is None:
+        metadata = StoreMetadata(store_id=store_id, updated_at=timestamp)
+        session.add(metadata)
+    else:
+        metadata.updated_at = timestamp
+    return timestamp
+
+
+def delete_store_metadata(session, store_id: str) -> None:
+    metadata = session.get(StoreMetadata, store_id)
+    if metadata is not None:
+        session.delete(metadata)
+
+
+def get_store_updated_at(session, store_id: str) -> str:
+    metadata = session.get(StoreMetadata, store_id)
+    return metadata.updated_at if metadata is not None else now_iso()
+
+
+def decode_legacy_payload(raw_payload: Any) -> Any:
+    if raw_payload is None:
+        return None
+    if isinstance(raw_payload, memoryview):
+        raw_payload = raw_payload.tobytes()
+    if isinstance(raw_payload, (bytes, bytearray)):
+        raw_payload = raw_payload.decode("utf-8")
+    if isinstance(raw_payload, str):
+        return json.loads(raw_payload)
+    return raw_payload
+
+
+def read_legacy_payload(session, store_id: str) -> Any | None:
+    if not LEGACY_TABLE_AVAILABLE:
+        return None
+
+    query = text(f"SELECT payload FROM {LEGACY_STORE_TABLE} WHERE store_id = :store_id")
+    result = session.execute(query, {"store_id": store_id}).mappings().first()
+    if result is None:
+        return None
+    return decode_legacy_payload(result["payload"])
+
+
+def normalize_site_apps(value: Any) -> list[dict[str, str]]:
+    raw_apps = value.get("apps") if isinstance(value, dict) else value
+    if not isinstance(raw_apps, list):
+        return []
+
+    apps: list[dict[str, str]] = []
+    used_slugs: set[str] = set()
+
+    for index, raw_app in enumerate(raw_apps):
+        if not isinstance(raw_app, dict):
+            continue
+
+        name = as_text(raw_app.get("nome") or raw_app.get("name"))
+        description = as_text(raw_app.get("descricao") or raw_app.get("description"))
+        href = as_text(raw_app.get("href"))
+
+        if not name or not href:
+            continue
+
+        preferred_slug = as_text(raw_app.get("slug")) or slugify(href or name or f"app-{index + 1}")
+        slug = unique_slug(preferred_slug, used_slugs)
+        apps.append({"slug": slug, "nome": name, "descricao": description, "href": href})
+
+    return apps
+
+
+def normalize_gps_songs(value: Any) -> list[dict[str, Any]]:
+    raw_songs = value.get("songs") if isinstance(value, dict) else value
+    if not isinstance(raw_songs, list):
+        return []
+
+    songs: list[dict[str, Any]] = []
+
+    for song_index, raw_song in enumerate(raw_songs):
+        if not isinstance(raw_song, dict):
+            continue
+
+        song_id = as_text(raw_song.get("id")) or f"song-{song_index + 1}"
+        tags = raw_song.get("tags") if isinstance(raw_song.get("tags"), list) else []
+        blocks = raw_song.get("blocks") if isinstance(raw_song.get("blocks"), list) else []
+        audio_meta = raw_song.get("audioMeta") if isinstance(raw_song.get("audioMeta"), dict) else None
+        created_at = as_text(raw_song.get("createdAt")) or now_iso()
+        updated_at = as_text(raw_song.get("updatedAt")) or created_at
+
+        songs.append(
+            {
+                "id": song_id,
+                "sort_order": song_index,
+                "title": as_text(raw_song.get("title")),
+                "artist": as_text(raw_song.get("artist")),
+                "song_key": as_text(raw_song.get("key")),
+                "notes": as_text(raw_song.get("notes")),
+                "audio_name": as_text(audio_meta.get("name")) if audio_meta else None,
+                "audio_mime": as_text(audio_meta.get("mime")) if audio_meta else None,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "tags": [as_text(tag) for tag in tags if as_text(tag)],
+                "blocks": [
+                    {
+                        "sort_order": block_index,
+                        "block_type": as_text(raw_block.get("type"), "Bloco") or "Bloco",
+                        "title": as_text(raw_block.get("title")),
+                        "chords": as_text(raw_block.get("chords")),
+                        "lyrics": as_text(raw_block.get("lyrics")),
+                        "time_sec": as_float(raw_block.get("timeSec")) if raw_block.get("timeSec") not in (None, "") else None,
+                    }
+                    for block_index, raw_block in enumerate(blocks)
+                    if isinstance(raw_block, dict)
+                ],
+            }
+        )
+
+    return songs
+
+
+def normalize_finance_state(value: Any) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+
+    raw_config = data.get("config") if isinstance(data.get("config"), dict) else {}
+    raw_accounts = data.get("contas") if isinstance(data.get("contas"), list) else []
+    raw_categories = data.get("categorias") if isinstance(data.get("categorias"), list) else []
+    raw_transactions = data.get("lancamentos") if isinstance(data.get("lancamentos"), list) else []
+    raw_imports = data.get("imports") if isinstance(data.get("imports"), list) else []
+    raw_reconciliations = data.get("reconciliations") if isinstance(data.get("reconciliations"), list) else []
+    raw_titles = data.get("titulos") if isinstance(data.get("titulos"), list) else []
+
+    return {
+        "config": {
+            "tolDias": as_int(raw_config.get("tolDias"), 3),
+            "tolValor": as_float(raw_config.get("tolValor"), 0.5),
+            "scoreMin": as_int(raw_config.get("scoreMin"), 60),
+        },
+        "contas": [
+            {
+                "id": as_text(raw_account.get("id")) or f"conta-{index + 1}",
+                "sort_order": index,
+                "nome": as_text(raw_account.get("nome")),
+                "moeda": as_text(raw_account.get("moeda"), "BRL") or "BRL",
+                "saldoInicial": as_float(raw_account.get("saldoInicial"), 0.0),
+            }
+            for index, raw_account in enumerate(raw_accounts)
+            if isinstance(raw_account, dict)
+        ],
+        "categorias": [
+            {
+                "id": as_text(raw_category.get("id")) or f"cat-{index + 1}",
+                "sort_order": index,
+                "nome": as_text(raw_category.get("nome")),
+                "tipo": as_text(raw_category.get("tipo"), "DESPESA") or "DESPESA",
+            }
+            for index, raw_category in enumerate(raw_categories)
+            if isinstance(raw_category, dict)
+        ],
+        "lancamentos": [
+            {
+                "id": as_text(raw_transaction.get("id")) or f"lanc-{index + 1}",
+                "sort_order": index,
+                "data": as_text(raw_transaction.get("data")),
+                "contaId": as_text(raw_transaction.get("contaId")),
+                "tipo": as_text(raw_transaction.get("tipo"), "DESPESA") or "DESPESA",
+                "categoriaId": as_text(raw_transaction.get("categoriaId")),
+                "desc": as_text(raw_transaction.get("desc")),
+                "valor": as_float(raw_transaction.get("valor"), 0.0),
+                "conciliado": as_bool(raw_transaction.get("conciliado"), False),
+                "bankTxId": as_text(raw_transaction.get("bankTxId")) or None,
+            }
+            for index, raw_transaction in enumerate(raw_transactions)
+            if isinstance(raw_transaction, dict)
+        ],
+        "imports": [
+            {
+                "id": as_text(raw_import.get("id")) or f"imp-{index + 1}",
+                "sort_order": index,
+                "contaId": as_text(raw_import.get("contaId")),
+                "createdAt": as_text(raw_import.get("createdAt")) or now_iso(),
+                "fileName": as_text(raw_import.get("fileName"), "import.ofx") or "import.ofx",
+                "txs": [
+                    {
+                        "id": as_text(raw_tx.get("id")) or f"banktx-{index + 1}-{tx_index + 1}",
+                        "sort_order": tx_index,
+                        "date": as_text(raw_tx.get("date")),
+                        "amount": as_float(raw_tx.get("amount"), 0.0),
+                        "fitid": as_text(raw_tx.get("fitid")),
+                        "memo": as_text(raw_tx.get("memo")),
+                        "trntype": as_text(raw_tx.get("trntype")),
+                    }
+                    for tx_index, raw_tx in enumerate(raw_import.get("txs") if isinstance(raw_import.get("txs"), list) else [])
+                    if isinstance(raw_tx, dict)
+                ],
+            }
+            for index, raw_import in enumerate(raw_imports)
+            if isinstance(raw_import, dict)
+        ],
+        "reconciliations": [
+            {
+                "bankTxId": as_text(raw_reconciliation.get("bankTxId")),
+                "lancId": as_text(raw_reconciliation.get("lancId")),
+                "sort_order": index,
+            }
+            for index, raw_reconciliation in enumerate(raw_reconciliations)
+            if isinstance(raw_reconciliation, dict)
+            and as_text(raw_reconciliation.get("bankTxId"))
+            and as_text(raw_reconciliation.get("lancId"))
+        ],
+        "titulos": [
+            {
+                "id": as_text(raw_title.get("id")) or f"tit-{index + 1}",
+                "sort_order": index,
+                "tipo": as_text(raw_title.get("tipo"), "AP") or "AP",
+                "pessoa": as_text(raw_title.get("pessoa")),
+                "desc": as_text(raw_title.get("desc")),
+                "categoriaId": as_text(raw_title.get("categoriaId")),
+                "contaId": as_text(raw_title.get("contaId")),
+                "valor": as_float(raw_title.get("valor"), 0.0),
+                "vencimento": as_text(raw_title.get("vencimento")),
+                "centroCusto": as_text(raw_title.get("centroCusto")),
+                "obs": as_text(raw_title.get("obs")),
+                "status": as_text(raw_title.get("status"), "ABERTO") or "ABERTO",
+                "baixadoEm": as_text(raw_title.get("baixadoEm")) or None,
+                "lancId": as_text(raw_title.get("lancId")) or None,
+                "bankTxId": as_text(raw_title.get("bankTxId")) or None,
+                "anexos": [
+                    {
+                        "id": as_text(raw_attachment.get("id")) or f"anx-{index + 1}-{attachment_index + 1}",
+                        "sort_order": attachment_index,
+                        "name": as_text(raw_attachment.get("name")),
+                        "mime": as_text(raw_attachment.get("mime"), "application/octet-stream") or "application/octet-stream",
+                        "dataUrl": as_text(raw_attachment.get("dataUrl")),
+                    }
+                    for attachment_index, raw_attachment in enumerate(raw_title.get("anexos") if isinstance(raw_title.get("anexos"), list) else [])
+                    if isinstance(raw_attachment, dict)
+                ],
+            }
+            for index, raw_title in enumerate(raw_titles)
+            if isinstance(raw_title, dict)
+        ],
+    }
+
+
+def ensure_site_store(session) -> None:
+    has_apps = session.execute(select(SiteApp.id).limit(1)).first() is not None
+    if has_apps and store_exists(session, STORE_SITE):
+        return
+    replace_site_store(session, DEFAULT_SITE_APPS)
+
+
+def read_site_store(session) -> list[dict[str, str]]:
+    ensure_site_store(session)
+    apps = session.execute(select(SiteApp).order_by(SiteApp.sort_order, SiteApp.id)).scalars().all()
+    return [
+        {"slug": app.slug, "nome": app.name, "descricao": app.description, "href": app.href}
+        for app in apps
+    ]
+
+
+def replace_site_store(session, value: Any) -> str:
+    apps = normalize_site_apps(value)
+    session.execute(delete(SiteApp))
+
+    for index, app in enumerate(apps):
+        session.add(
+            SiteApp(
+                slug=app["slug"],
+                name=app["nome"],
+                description=app["descricao"],
+                href=app["href"],
+                sort_order=index,
+            )
+        )
+
+    return touch_store(session, STORE_SITE)
+
+
+def clear_site_store(session) -> None:
+    session.execute(delete(SiteApp))
+    delete_store_metadata(session, STORE_SITE)
+
+
+def read_gps_store(session) -> list[dict[str, Any]]:
+    songs = session.execute(select(GpsSong).order_by(GpsSong.sort_order, GpsSong.id)).scalars().all()
+    tags = session.execute(select(GpsSongTag).order_by(GpsSongTag.song_id, GpsSongTag.sort_order, GpsSongTag.id)).scalars().all()
+    blocks = session.execute(
+        select(GpsSongBlock).order_by(GpsSongBlock.song_id, GpsSongBlock.sort_order, GpsSongBlock.id)
+    ).scalars().all()
+
+    tags_by_song: dict[str, list[str]] = {}
+    for tag in tags:
+        tags_by_song.setdefault(tag.song_id, []).append(tag.value)
+
+    blocks_by_song: dict[str, list[dict[str, Any]]] = {}
+    for block in blocks:
+        blocks_by_song.setdefault(block.song_id, []).append(
+            {
+                "type": block.block_type,
+                "title": block.title,
+                "chords": block.chords,
+                "lyrics": block.lyrics,
+                "timeSec": block.time_sec,
+            }
+        )
+
+    payload: list[dict[str, Any]] = []
+    for song in songs:
+        audio_meta = None
+        if song.audio_name or song.audio_mime:
+            audio_meta = {"name": song.audio_name or "", "mime": song.audio_mime or ""}
+
+        payload.append(
+            {
+                "id": song.id,
+                "title": song.title,
+                "artist": song.artist,
+                "key": song.song_key,
+                "tags": tags_by_song.get(song.id, []),
+                "notes": song.notes,
+                "audioMeta": audio_meta,
+                "blocks": blocks_by_song.get(song.id, []),
+                "createdAt": song.created_at,
+                "updatedAt": song.updated_at,
+            }
+        )
+
+    return payload
+
+
+def replace_gps_store(session, value: Any) -> str:
+    songs = normalize_gps_songs(value)
+
+    session.execute(delete(GpsSongBlock))
+    session.execute(delete(GpsSongTag))
+    session.execute(delete(GpsSong))
+
+    for song in songs:
+        session.add(
+            GpsSong(
+                id=song["id"],
+                sort_order=song["sort_order"],
+                title=song["title"],
+                artist=song["artist"],
+                song_key=song["song_key"],
+                notes=song["notes"],
+                audio_name=song["audio_name"],
+                audio_mime=song["audio_mime"],
+                created_at=song["created_at"],
+                updated_at=song["updated_at"],
+            )
+        )
+
+        for tag_index, tag_value in enumerate(song["tags"]):
+            session.add(GpsSongTag(song_id=song["id"], sort_order=tag_index, value=tag_value))
+
+        for block in song["blocks"]:
+            session.add(
+                GpsSongBlock(
+                    song_id=song["id"],
+                    sort_order=block["sort_order"],
+                    block_type=block["block_type"],
+                    title=block["title"],
+                    chords=block["chords"],
+                    lyrics=block["lyrics"],
+                    time_sec=block["time_sec"],
+                )
+            )
+
+    return touch_store(session, STORE_GPS)
+
+
+def clear_gps_store(session) -> None:
+    session.execute(delete(GpsSongBlock))
+    session.execute(delete(GpsSongTag))
+    session.execute(delete(GpsSong))
+    delete_store_metadata(session, STORE_GPS)
+
+
+def read_finance_store(session) -> dict[str, Any]:
+    config = session.get(FinanceConfig, 1)
+    accounts = session.execute(select(FinanceAccount).order_by(FinanceAccount.sort_order, FinanceAccount.id)).scalars().all()
+    categories = session.execute(select(FinanceCategory).order_by(FinanceCategory.sort_order, FinanceCategory.id)).scalars().all()
+    transactions = session.execute(
+        select(FinanceTransaction).order_by(FinanceTransaction.sort_order, FinanceTransaction.id)
+    ).scalars().all()
+    imports = session.execute(select(FinanceImport).order_by(FinanceImport.sort_order, FinanceImport.id)).scalars().all()
+    bank_transactions = session.execute(
+        select(FinanceBankTransaction).order_by(
+            FinanceBankTransaction.import_id,
+            FinanceBankTransaction.sort_order,
+            FinanceBankTransaction.id,
+        )
+    ).scalars().all()
+    reconciliations = session.execute(
+        select(FinanceReconciliation).order_by(FinanceReconciliation.sort_order, FinanceReconciliation.bank_tx_id)
+    ).scalars().all()
+    titles = session.execute(select(FinanceTitle).order_by(FinanceTitle.sort_order, FinanceTitle.id)).scalars().all()
+    attachments = session.execute(
+        select(FinanceTitleAttachment).order_by(
+            FinanceTitleAttachment.title_id,
+            FinanceTitleAttachment.sort_order,
+            FinanceTitleAttachment.id,
+        )
+    ).scalars().all()
+
+    bank_tx_by_import: dict[str, list[dict[str, Any]]] = {}
+    for bank_tx in bank_transactions:
+        bank_tx_by_import.setdefault(bank_tx.import_id, []).append(
+            {
+                "id": bank_tx.id,
+                "date": bank_tx.data,
+                "amount": bank_tx.amount,
+                "fitid": bank_tx.fitid,
+                "memo": bank_tx.memo,
+                "trntype": bank_tx.trntype,
+            }
+        )
+
+    attachments_by_title: dict[str, list[dict[str, Any]]] = {}
+    for attachment in attachments:
+        attachments_by_title.setdefault(attachment.title_id, []).append(
+            {
+                "id": attachment.id,
+                "name": attachment.name,
+                "mime": attachment.mime,
+                "dataUrl": attachment.data_url,
+            }
+        )
+
+    cfg = default_finance_config()
+    return {
+        "contas": [
+            {"id": account.id, "nome": account.nome, "moeda": account.moeda, "saldoInicial": account.saldo_inicial}
+            for account in accounts
+        ],
+        "categorias": [
+            {"id": category.id, "nome": category.nome, "tipo": category.tipo}
+            for category in categories
+        ],
+        "lancamentos": [
+            {
+                "id": transaction.id,
+                "data": transaction.data,
+                "contaId": transaction.conta_id,
+                "tipo": transaction.tipo,
+                "categoriaId": transaction.categoria_id,
+                "desc": transaction.descricao,
+                "valor": transaction.valor,
+                "conciliado": transaction.conciliado,
+                "bankTxId": transaction.bank_tx_id,
+            }
+            for transaction in transactions
+        ],
+        "imports": [
+            {
+                "id": imported.id,
+                "contaId": imported.conta_id,
+                "createdAt": imported.created_at,
+                "fileName": imported.file_name,
+                "txs": bank_tx_by_import.get(imported.id, []),
+            }
+            for imported in imports
+        ],
+        "reconciliations": [
+            {"bankTxId": reconciliation.bank_tx_id, "lancId": reconciliation.lanc_id}
+            for reconciliation in reconciliations
+        ],
+        "titulos": [
+            {
+                "id": title.id,
+                "tipo": title.tipo,
+                "pessoa": title.pessoa,
+                "desc": title.descricao,
+                "categoriaId": title.categoria_id,
+                "contaId": title.conta_id,
+                "valor": title.valor,
+                "vencimento": title.vencimento,
+                "centroCusto": title.centro_custo,
+                "obs": title.observacoes,
+                "status": title.status,
+                "baixadoEm": title.baixado_em,
+                "lancId": title.lanc_id,
+                "bankTxId": title.bank_tx_id,
+                "anexos": attachments_by_title.get(title.id, []),
+            }
+            for title in titles
+        ],
+        "config": {
+            "tolDias": config.tol_dias if config is not None else cfg["tolDias"],
+            "tolValor": config.tol_valor if config is not None else cfg["tolValor"],
+            "scoreMin": config.score_min if config is not None else cfg["scoreMin"],
+        },
+    }
+
+
+def replace_finance_store(session, value: Any) -> str:
+    state = normalize_finance_state(value)
+
+    session.execute(delete(FinanceReconciliation))
+    session.execute(delete(FinanceTitleAttachment))
+    session.execute(delete(FinanceTitle))
+    session.execute(delete(FinanceBankTransaction))
+    session.execute(delete(FinanceImport))
+    session.execute(delete(FinanceTransaction))
+    session.execute(delete(FinanceCategory))
+    session.execute(delete(FinanceAccount))
+    session.execute(delete(FinanceConfig))
+
+    config = state["config"]
+    session.add(
+        FinanceConfig(
+            singleton_id=1,
+            tol_dias=config["tolDias"],
+            tol_valor=config["tolValor"],
+            score_min=config["scoreMin"],
+        )
+    )
+
+    for account in state["contas"]:
+        session.add(
+            FinanceAccount(
+                id=account["id"],
+                sort_order=account["sort_order"],
+                nome=account["nome"],
+                moeda=account["moeda"],
+                saldo_inicial=account["saldoInicial"],
+            )
+        )
+
+    for category in state["categorias"]:
+        session.add(
+            FinanceCategory(
+                id=category["id"],
+                sort_order=category["sort_order"],
+                nome=category["nome"],
+                tipo=category["tipo"],
+            )
+        )
+
+    for transaction in state["lancamentos"]:
+        session.add(
+            FinanceTransaction(
+                id=transaction["id"],
+                sort_order=transaction["sort_order"],
+                data=transaction["data"],
+                conta_id=transaction["contaId"],
+                tipo=transaction["tipo"],
+                categoria_id=transaction["categoriaId"],
+                descricao=transaction["desc"],
+                valor=transaction["valor"],
+                conciliado=transaction["conciliado"],
+                bank_tx_id=transaction["bankTxId"],
+            )
+        )
+
+    for imported in state["imports"]:
+        session.add(
+            FinanceImport(
+                id=imported["id"],
+                sort_order=imported["sort_order"],
+                conta_id=imported["contaId"],
+                created_at=imported["createdAt"],
+                file_name=imported["fileName"],
+            )
+        )
+
+        for bank_tx in imported["txs"]:
+            session.add(
+                FinanceBankTransaction(
+                    id=bank_tx["id"],
+                    import_id=imported["id"],
+                    sort_order=bank_tx["sort_order"],
+                    data=bank_tx["date"],
+                    amount=bank_tx["amount"],
+                    fitid=bank_tx["fitid"],
+                    memo=bank_tx["memo"],
+                    trntype=bank_tx["trntype"],
+                )
+            )
+
+    for reconciliation in state["reconciliations"]:
+        session.add(
+            FinanceReconciliation(
+                bank_tx_id=reconciliation["bankTxId"],
+                lanc_id=reconciliation["lancId"],
+                sort_order=reconciliation["sort_order"],
+            )
+        )
+
+    for title in state["titulos"]:
+        session.add(
+            FinanceTitle(
+                id=title["id"],
+                sort_order=title["sort_order"],
+                tipo=title["tipo"],
+                pessoa=title["pessoa"],
+                descricao=title["desc"],
+                categoria_id=title["categoriaId"],
+                conta_id=title["contaId"],
+                valor=title["valor"],
+                vencimento=title["vencimento"],
+                centro_custo=title["centroCusto"],
+                observacoes=title["obs"],
+                status=title["status"],
+                baixado_em=title["baixadoEm"],
+                lanc_id=title["lancId"],
+                bank_tx_id=title["bankTxId"],
+            )
+        )
+
+        for attachment in title["anexos"]:
+            session.add(
+                FinanceTitleAttachment(
+                    id=attachment["id"],
+                    title_id=title["id"],
+                    sort_order=attachment["sort_order"],
+                    name=attachment["name"],
+                    mime=attachment["mime"],
+                    data_url=attachment["dataUrl"],
+                )
+            )
+
+    return touch_store(session, STORE_FINANCE)
+
+
+def clear_finance_store(session) -> None:
+    session.execute(delete(FinanceReconciliation))
+    session.execute(delete(FinanceTitleAttachment))
+    session.execute(delete(FinanceTitle))
+    session.execute(delete(FinanceBankTransaction))
+    session.execute(delete(FinanceImport))
+    session.execute(delete(FinanceTransaction))
+    session.execute(delete(FinanceCategory))
+    session.execute(delete(FinanceAccount))
+    session.execute(delete(FinanceConfig))
+    delete_store_metadata(session, STORE_FINANCE)
+
+
+def get_store_value(session, store_id: str) -> Any:
+    safe_store_id = ensure_supported_store(store_id)
+    if safe_store_id == STORE_SITE:
+        ensure_site_store(session)
+        return read_site_store(session)
+
+    if not store_exists(session, safe_store_id):
+        raise AppError(404, "Store not found.")
+
+    if safe_store_id == STORE_GPS:
+        return read_gps_store(session)
+
+    return read_finance_store(session)
+
+
+def put_store_value(session, store_id: str, value: Any) -> str:
+    safe_store_id = ensure_supported_store(store_id)
+    if safe_store_id == STORE_SITE:
+        return replace_site_store(session, value)
+    if safe_store_id == STORE_GPS:
+        return replace_gps_store(session, value)
+    return replace_finance_store(session, value)
+
+
+def delete_store_value(session, store_id: str) -> None:
+    safe_store_id = ensure_supported_store(store_id)
+    if safe_store_id == STORE_SITE:
+        clear_site_store(session)
+        return
+    if safe_store_id == STORE_GPS:
+        clear_gps_store(session)
+        return
+    clear_finance_store(session)
+
+
+def migrate_legacy_store(session, store_id: str) -> None:
+    if store_exists(session, store_id):
+        return
+
+    payload = read_legacy_payload(session, store_id)
+    if payload is None:
+        return
+
+    put_store_value(session, store_id, payload)
+
+
+def initialize_data() -> None:
+    with SessionLocal() as session:
+        with session.begin():
+            ensure_site_store(session)
+            migrate_legacy_store(session, STORE_GPS)
+            migrate_legacy_store(session, STORE_FINANCE)
+
+
+initialize_data()
+
+app = Flask(__name__)
+app.config["JSON_SORT_KEYS"] = False
+
+max_body_size = parse_size(os.getenv("MAX_BODY_SIZE", "25mb"))
+if max_body_size is not None:
+    app.config["MAX_CONTENT_LENGTH"] = max_body_size
+
+
+def ensure_within_root(candidate: Path) -> Path:
+    resolved_root = BASE_DIR.resolve()
+    resolved_candidate = candidate.resolve()
+    if resolved_candidate != resolved_root and resolved_root not in resolved_candidate.parents:
+        abort(404)
+    return resolved_candidate
+
+
+@app.get("/api/health")
+def healthcheck():
+    with SessionLocal() as session:
+        session.execute(text("SELECT 1"))
+        storage = {
+            "provider": DB_PROVIDER,
+            "database": database_label(DATABASE_URL),
+            "legacyTable": LEGACY_STORE_TABLE if LEGACY_TABLE_AVAILABLE else None,
+            "tables": [
+                "store_metadata",
+                "site_apps",
+                "gps_songs",
+                "gps_song_tags",
+                "gps_song_blocks",
+                "financeiro_config",
+                "financeiro_accounts",
+                "financeiro_categories",
+                "financeiro_transactions",
+                "financeiro_imports",
+                "financeiro_bank_transactions",
+                "financeiro_reconciliations",
+                "financeiro_titles",
+                "financeiro_title_attachments",
+            ],
+        }
+
+    return jsonify({"ok": True, "storage": storage, "timestamp": now_iso()})
+
+
+@app.get("/api/site/apps")
+def get_site_apps():
+    with SessionLocal() as session:
+        apps = read_site_store(session)
+        updated_at = get_store_updated_at(session, STORE_SITE)
+
+    return jsonify({"apps": apps, "updatedAt": updated_at})
+
+
+@app.get("/api/stores/<store_id>")
+def get_store(store_id: str):
+    with SessionLocal() as session:
+        value = get_store_value(session, store_id)
+        updated_at = get_store_updated_at(session, ensure_supported_store(store_id))
+
+    return jsonify({"exists": True, "storeId": store_id, "updatedAt": updated_at, "value": value})
+
+
+@app.put("/api/stores/<store_id>")
+def put_store(store_id: str):
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or "value" not in body:
+        return jsonify({"error": "Missing 'value' in request body."}), 400
+
+    with SessionLocal() as session:
+        with session.begin():
+            updated_at = put_store_value(session, store_id, body["value"])
+
+    return jsonify({"ok": True, "storeId": ensure_supported_store(store_id), "updatedAt": updated_at})
+
+
+@app.delete("/api/stores/<store_id>")
+def delete_store(store_id: str):
+    with SessionLocal() as session:
+        with session.begin():
+            delete_store_value(session, store_id)
+
+    return ("", 204)
+
+
+@app.route("/", defaults={"requested_path": ""})
+@app.route("/<path:requested_path>")
+def serve_static(requested_path: str):
+    if requested_path.startswith("api/"):
+        abort(404)
+
+    normalized_path = requested_path.strip("/")
+    if normalized_path == "":
+        normalized_path = "index.html"
+
+    candidate = ensure_within_root(BASE_DIR / normalized_path)
+
+    if candidate.is_dir():
+        index_file = candidate / "index.html"
+        if index_file.exists():
+            return send_from_directory(index_file.parent, index_file.name)
+
+    if candidate.exists() and candidate.is_file():
+        return send_from_directory(candidate.parent, candidate.name)
+
+    if not Path(normalized_path).suffix:
+        html_candidate = ensure_within_root(BASE_DIR / f"{normalized_path}.html")
+        if html_candidate.exists() and html_candidate.is_file():
+            return send_from_directory(html_candidate.parent, html_candidate.name)
+
+    abort(404)
+
+
+@app.errorhandler(Exception)
+def handle_error(error: Exception):
+    if isinstance(error, AppError):
+        status_code = error.status_code
+        message = str(error)
+    elif isinstance(error, HTTPException):
+        status_code = error.code or 500
+        message = error.description or "Request failed."
+    elif isinstance(error, SQLAlchemyError):
+        status_code = 500
+        message = "Database error."
+    else:
+        status_code = 500
+        message = "Internal server error."
+
+    app.logger.exception(error)
+    return jsonify({"error": message}), status_code
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)

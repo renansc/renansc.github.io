@@ -7,6 +7,15 @@
 ========================= */
 
 const LS_KEY = "gf_v1_data";
+const remoteSync = window.RemoteStoreClient
+  ? window.RemoteStoreClient.create({
+      storeId: "financeiro-nanotech",
+      normalize: migrate,
+      onError: (error, source) => {
+        console.warn("Financeiro sync error:", source, error);
+      }
+    })
+  : null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -36,6 +45,10 @@ function parseISODate(s){
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 
 function saveState(){
+  persistLocalState();
+  if(remoteSync) remoteSync.queueSave(state);
+}
+function persistLocalState(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
 }
 function loadState(){
@@ -44,6 +57,10 @@ function loadState(){
     try { return migrate(JSON.parse(raw)); } catch {}
   }
   return seed();
+}
+function replaceState(nextState){
+  state = migrate(nextState);
+  persistLocalState();
 }
 function migrate(d){
   if(!d.config) d.config = { tolDias: 3, tolValor: 0.5, scoreMin: 60 };
@@ -1524,7 +1541,7 @@ $("#btnImportJSON").addEventListener("click", async ()=>{
   try{
     const text = await file.text();
     const data = migrate(JSON.parse(text));
-    state = data;
+    replaceState(data);
     saveState();
     renderAll();
     alert("Backup importado com sucesso.");
@@ -1536,7 +1553,7 @@ $("#btnImportJSON").addEventListener("click", async ()=>{
 $("#btnReset").addEventListener("click", ()=>{
   if(confirm("Apagar tudo?")){
     localStorage.removeItem(LS_KEY);
-    state = seed();
+    replaceState(seed());
     saveState();
     renderAll();
   }
@@ -1548,4 +1565,29 @@ $("#btnReset").addEventListener("click", ()=>{
   $("#dashConta").value = "ALL";
   $("#fConta").value = "ALL";
   renderAll();
+
+  window.addEventListener("storage", (e)=>{
+    if(e.key !== LS_KEY || !e.newValue) return;
+    try{
+      replaceState(JSON.parse(e.newValue));
+      renderAll();
+    }catch{
+      console.warn("Falha ao ler atualizacao local.");
+    }
+  });
+
+  if(remoteSync){
+    remoteSync.bootstrap({
+      getLocalSnapshot: ()=>state,
+      applySnapshot: (snapshot)=>{
+        replaceState(snapshot);
+        renderAll();
+      }
+    });
+
+    window.addEventListener("focus", ()=> remoteSync.syncNow());
+    document.addEventListener("visibilitychange", ()=>{
+      if(!document.hidden) remoteSync.syncNow();
+    });
+  }
 })();

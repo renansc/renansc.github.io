@@ -429,6 +429,7 @@ audio{width:100%}
 </template>
 
 <audio id="audioMain" controls preload="metadata" style="width:100%"></audio>
+<script src="../shared/remote-store.js"></script>
 <script>
 /* ===== Se houver erro, você vai ver na hora ===== */
 window.onerror = function(msg, src, line, col){
@@ -440,6 +441,15 @@ const STORAGE_KEY = "gps_musical_db_v5";
 const IDB_NAME = "gps_musical_media";
 const IDB_VER = 1;
 const IDB_STORE = "audio"; // key: songId, value: {name, mime, blob}
+const REMOTE_STORE = window.RemoteStoreClient
+  ? window.RemoteStoreClient.create({
+      storeId: "gps-musical",
+      normalize: normalizeSongs,
+      onError: (error, source) => {
+        console.warn("GPS Musical sync error:", source, error);
+      }
+    })
+  : null;
 
 const state = {
   songs: [],
@@ -471,6 +481,33 @@ function esc(s){
 }
 function normalize(str){ return (str || "").toString().toLowerCase().trim(); }
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function normalizeSongs(songs){
+  if(!Array.isArray(songs)) return [];
+  return songs.map(s=>({
+    id: s?.id || uid(),
+    title: (s?.title || "").toString(),
+    artist: (s?.artist || "").toString(),
+    key: (s?.key || "").toString(),
+    tags: Array.isArray(s?.tags) ? s.tags.map(tag=>String(tag)) : [],
+    notes: (s?.notes || "").toString(),
+    audioMeta: s?.audioMeta && typeof s.audioMeta === "object"
+      ? {
+          name: (s.audioMeta.name || "").toString(),
+          mime: (s.audioMeta.mime || "").toString(),
+        }
+      : null,
+    blocks: Array.isArray(s?.blocks) ? s.blocks.map(b=>({
+      type: (b?.type || "Bloco").toString(),
+      title: (b?.title || "").toString(),
+      chords: (b?.chords || "").toString(),
+      lyrics: (b?.lyrics || "").toString(),
+      timeSec: Number.isFinite(+b?.timeSec) ? (+b.timeSec) : null,
+    })) : [],
+    createdAt: s?.createdAt || nowISO(),
+    updatedAt: s?.updatedAt || nowISO(),
+  }));
+}
 
 function fmtTime(sec){
   sec = Math.max(0, Number(sec) || 0);
@@ -526,17 +563,25 @@ async function idbDeleteAudio(songId){
   });
 }
 
-/* ===== DB (músicas em localStorage) ===== */
+/* ===== DB (mÃºsicas em localStorage) ===== */
 function DB_load(){
   const raw = localStorage.getItem(STORAGE_KEY);
   if(!raw) return [];
   const data = safeParseJSON(raw);
-  return Array.isArray(data) ? data : [];
+  return normalizeSongs(data);
 }
 function DB_save(){
+  state.songs = normalizeSongs(state.songs);
+  DB_saveLocal();
+  if(REMOTE_STORE) REMOTE_STORE.queueSave(state.songs);
+}
+function DB_saveLocal(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.songs, null, 2));
 }
-
+function DB_replaceSongs(songs){
+  state.songs = normalizeSongs(songs);
+  DB_saveLocal();
+}
 /* ===== Tabs ===== */
 function UI_showTab(name){
   ["biblioteca","editor","backup"].forEach(t=>{
@@ -1213,6 +1258,35 @@ function seedIfEmpty(){
   UI_resetEditor();
   UI_showTab("biblioteca");
 
+  window.addEventListener("storage", (e)=>{
+    if(e.key !== STORAGE_KEY || !e.newValue) return;
+    state.songs = DB_load();
+    UI_renderSongList();
+  });
+
+  if(REMOTE_STORE){
+    REMOTE_STORE.bootstrap({
+      getLocalSnapshot: ()=>state.songs,
+      applySnapshot: (snapshot)=>{
+        if(state.editingId) return false;
+        DB_replaceSongs(snapshot);
+        UI_renderSongList();
+
+        if(state.viewingId && state.songs.some(song=>song.id === state.viewingId)){
+          UI_openSongView(state.viewingId);
+        }else if(state.viewingId){
+          state.viewingId = null;
+          UI_showTab("biblioteca");
+        }
+      }
+    });
+
+    window.addEventListener("focus", ()=> REMOTE_STORE.syncNow());
+    document.addEventListener("visibilitychange", ()=>{
+      if(!document.hidden) REMOTE_STORE.syncNow();
+    });
+  }
+
   // atalhos palco
   document.addEventListener("keydown", (e)=>{
     const open = document.getElementById("stage").classList.contains("active");
@@ -1222,16 +1296,15 @@ function seedIfEmpty(){
     if(e.key==="ArrowLeft") PLAYER_prev();
   });
 
-  // atualizar relógio do palco quando áudio roda
+  // atualizar relÃ³gio do palco quando Ã¡udio roda
   const st = getAudio();
   st.addEventListener("timeupdate", ()=>{
     const dur = Number.isFinite(st.duration) ? st.duration : 0;
     document.getElementById("stageTime").textContent = `${fmtTime(st.currentTime)} / ${fmtTime(dur)}`;
   });
 
-  console.log("GPS Musical v5 (IndexedDB áudio) carregado OK");
-})();
-</script>
+  console.log("GPS Musical v5 (IndexedDB Ã¡udio) carregado OK");
+})();</script>
 
 </body>
 </html>
