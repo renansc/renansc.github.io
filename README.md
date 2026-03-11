@@ -1,6 +1,6 @@
 # Portal Renan SC
 
-Portal com dois aplicativos estaticos e um portal principal servidos por um backend Python com Flask:
+Portal com dois aplicativos estaticos e um portal principal servidos por um backend Python com Flask, sem dependencia de Node:
 
 - `FinanceiroNanotech`
 - `GPSMusical`
@@ -65,10 +65,33 @@ Os dados nao ficam mais em um `payload` generico. O backend grava em tabelas ded
 - `financeiro_reconciliations`
 - `financeiro_titles`
 - `financeiro_title_attachments`
+- `financeiro_reminder_logs`
 
 Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical` e `financeiro-nanotech` no startup.
 
 Quando o app roda com SQLite, os dados ficam em `data/app.db`.
+
+## Anexos do financeiro
+
+Os anexos de contas a pagar/receber sao enviados para a pasta `dados/` por padrao.
+
+- Use `FINANCE_ATTACHMENTS_DIR` para trocar o destino dos arquivos.
+- Se quiser aproveitar uma pasta sincronizada do Google Drive, aponte `FINANCE_ATTACHMENTS_DIR` para esse diretorio montado/sincronizado.
+- Os arquivos sao organizados em subpastas `YYYY-MM` conforme o vencimento.
+- A leitura de QR Code e codigo de barras roda no Flask/Python via `Pillow` + `pyzbar`.
+
+## Avisos por e-mail
+
+Os lembretes usam SMTP configurado no servidor.
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_USE_TLS` ou `SMTP_USE_SSL`
+- `FINANCE_REMINDER_TO`
+- `FINANCE_REMINDER_FROM`
+- `FINANCE_REMINDER_LOOKAHEAD_DAYS`
 
 Para producao, configure `DATABASE_URL` apontando para PostgreSQL ou MySQL, ou use um disco persistente se optar por SQLite.
 

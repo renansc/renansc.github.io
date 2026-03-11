@@ -21,6 +21,7 @@ body{
               radial-gradient(900px 600px at 80% 10%, rgba(94,234,212,.18), transparent 60%),
               var(--bg);
   color:var(--text);
+  overflow-x:hidden;
 }
 
 .topbar{
@@ -128,7 +129,7 @@ body{
 .end{ justify-content:flex-end; }
 .gap{ gap: 10px; }
 
-input, select, button{ font: inherit; }
+input, select, button{ font: inherit; max-width:100%; }
 input, select{
   background: rgba(15,23,48,.7);
   border: 1px solid var(--line);
@@ -209,7 +210,7 @@ input::placeholder{ color: rgba(174,183,231,.65); }
   align-items: center;
   justify-content: space-between;
 }
-.item .left{ display:flex; gap:10px; align-items:center; }
+.item .left{ display:flex; gap:10px; align-items:center; min-width:0; }
 
 .badge{
   font-size: 11px;
@@ -253,9 +254,10 @@ input::placeholder{ color: rgba(174,183,231,.65); }
   inset: 0;
   background: rgba(0,0,0,.55);
   display:flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 14px;
+  overflow-y:auto;
   z-index: 50;
 }
 .modalBox{
@@ -265,6 +267,9 @@ input::placeholder{ color: rgba(174,183,231,.65); }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 14px;
+  max-height: calc(100vh - 28px);
+  overflow:auto;
+  margin: auto 0;
 }
 .modalHead{
   display:flex;
@@ -292,6 +297,38 @@ input::placeholder{ color: rgba(174,183,231,.65); }
 @media (max-width: 640px){
   .formGrid{ grid-template-columns: 1fr; }
   .formGrid .span2{ grid-column: auto; }
+  .row.end{ justify-content:stretch; }
+  .row.end .btn{ flex:1; }
+  .modal{ padding: 10px; }
+  .modalBox{ max-height: calc(100vh - 20px); padding: 12px; }
+}
+
+.sectionBox{
+  border:1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(15,23,48,.35);
+  padding: 12px;
+}
+
+.toggleLabel{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.toggleLabel input{
+  width: 18px;
+  height: 18px;
+}
+
+.nestedGrid{
+  margin: 10px 0 0;
+}
+
+.codeBox{
+  min-height: 120px;
 }
 
 .selected{

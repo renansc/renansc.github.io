@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
+import mimetypes
 import os
 import re
+import smtplib
 import unicodedata
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from email.message import EmailMessage
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -15,6 +21,16 @@ from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, del
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from werkzeug.exceptions import HTTPException
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - optional dependency
+    Image = None
+
+try:
+    from pyzbar.pyzbar import decode as pyzbar_decode
+except ImportError:  # pragma: no cover - optional dependency
+    pyzbar_decode = None
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -123,6 +139,15 @@ def resolve_data_dir() -> Path:
     return data_dir
 
 
+def resolve_attachment_dir() -> Path:
+    configured = os.getenv("FINANCE_ATTACHMENTS_DIR") or os.getenv("ATTACHMENTS_DIR")
+    attachment_dir = Path(configured).expanduser() if configured else BASE_DIR / "dados"
+    if not attachment_dir.is_absolute():
+        attachment_dir = BASE_DIR / attachment_dir
+    attachment_dir.mkdir(parents=True, exist_ok=True)
+    return attachment_dir
+
+
 def resolve_sqlite_path(value: str, data_dir: Path) -> Path:
     sqlite_path = Path(value).expanduser() if value else data_dir / "app.db"
     if not sqlite_path.is_absolute():
@@ -222,6 +247,13 @@ def as_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
+def as_date(value: Any) -> date | None:
+    try:
+        return datetime.strptime(as_text(value), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 def slugify(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value or "")
     ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
@@ -239,10 +271,171 @@ def unique_slug(base: str, used: set[str]) -> str:
     return slug
 
 
+def compact_slug(value: str, fallback: str = "item", max_length: int = 48) -> str:
+    slug = slugify(value)[:max_length].strip("-")
+    return slug or fallback
+
+
+def attachment_folder_name(vencimento: str) -> str:
+    due_date = as_date(vencimento)
+    return due_date.strftime("%Y-%m") if due_date else "sem-data"
+
+
+def attachment_extension(filename: str, mime_type: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix and len(suffix) <= 10:
+        return suffix
+    guessed = mimetypes.guess_extension(mime_type or "")
+    if guessed == ".jpe":
+        return ".jpg"
+    return guessed or ""
+
+
+def build_attachment_filename(vencimento: str, conta_nome: str, pessoa: str, descricao: str, original_name: str, mime_type: str) -> str:
+    parts = [
+        compact_slug(vencimento, fallback="sem-data", max_length=16),
+        compact_slug(conta_nome, fallback="sem-conta", max_length=32),
+        compact_slug(pessoa, fallback="sem-pessoa", max_length=32),
+        compact_slug(descricao, fallback="sem-descricao", max_length=40),
+    ]
+    extension = attachment_extension(original_name, mime_type)
+    return "_".join(parts) + extension
+
+
+def ensure_unique_file_path(directory: Path, file_name: str) -> Path:
+    candidate = directory / file_name
+    stem = candidate.stem
+    suffix = candidate.suffix
+    counter = 2
+    while candidate.exists():
+        candidate = directory / f"{stem}-{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
+def ensure_within_directory(root: Path, candidate: Path) -> Path:
+    resolved_root = root.resolve()
+    resolved_candidate = candidate.resolve()
+    if resolved_candidate != resolved_root and resolved_root not in resolved_candidate.parents:
+        raise AppError(404, "Attachment not found.")
+    return resolved_candidate
+
+
+def build_attachment_url(relative_path: str) -> str:
+    return f"/api/finance/attachments/{quote(relative_path, safe='/')}"
+
+
+def decode_attachment_payload(raw_value: str) -> dict[str, Any]:
+    payload_text = as_text(raw_value)
+    if not payload_text:
+        return {}
+
+    if payload_text.startswith("data:"):
+        return {"dataUrl": payload_text}
+
+    try:
+        payload = json.loads(payload_text)
+    except json.JSONDecodeError:
+        return {"dataUrl": payload_text}
+
+    if not isinstance(payload, dict):
+        return {"dataUrl": payload_text}
+
+    relative_path = as_text(payload.get("path"))
+    return {
+        "dataUrl": as_text(payload.get("dataUrl")),
+        "url": as_text(payload.get("url")) or (build_attachment_url(relative_path) if relative_path else ""),
+        "path": relative_path,
+        "size": as_int(payload.get("size"), 0),
+        "storage": as_text(payload.get("storage"), "filesystem") or "filesystem",
+    }
+
+
+def encode_attachment_payload(attachment: dict[str, Any]) -> str:
+    data_url = as_text(attachment.get("dataUrl"))
+    if data_url.startswith("data:"):
+        return data_url
+
+    payload = {
+        "storage": as_text(attachment.get("storage"), "filesystem") or "filesystem",
+        "url": as_text(attachment.get("url")),
+        "path": as_text(attachment.get("path")),
+        "size": as_int(attachment.get("size"), 0),
+    }
+    if data_url:
+        payload["dataUrl"] = data_url
+    return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+
+
+def cleanup_empty_attachment_dirs(start_dir: Path) -> None:
+    current = start_dir
+    root = ATTACHMENTS_DIR.resolve()
+    while current.exists() and current != root:
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent
+
+
+def finance_mail_settings() -> dict[str, Any]:
+    recipients = [item.strip() for item in str(os.getenv("FINANCE_REMINDER_TO", "")).split(",") if item.strip()]
+    host = str(os.getenv("SMTP_HOST", "")).strip()
+    return {
+        "enabled": bool(host and recipients),
+        "host": host,
+        "port": as_int(os.getenv("SMTP_PORT"), 587),
+        "username": str(os.getenv("SMTP_USER", "")).strip(),
+        "password": os.getenv("SMTP_PASSWORD", ""),
+        "from": str(os.getenv("FINANCE_REMINDER_FROM") or os.getenv("SMTP_FROM") or "").strip(),
+        "to": recipients,
+        "use_tls": parse_bool(os.getenv("SMTP_USE_TLS"), True),
+        "use_ssl": parse_bool(os.getenv("SMTP_USE_SSL"), False),
+    }
+
+
+def image_bytes_from_data_url(data_url: str) -> bytes:
+    payload = as_text(data_url)
+    if not payload.startswith("data:") or "," not in payload:
+        raise AppError(400, "Data URL invalida.")
+
+    header, encoded = payload.split(",", 1)
+    if ";base64" not in header:
+        raise AppError(400, "A imagem precisa estar em base64.")
+
+    try:
+        return base64.b64decode(encoded, validate=True)
+    except binascii.Error as exc:
+        raise AppError(400, "Falha ao decodificar a imagem enviada.") from exc
+
+
+def decode_image_codes(content: bytes) -> list[dict[str, str]]:
+    if Image is None or pyzbar_decode is None:
+        raise AppError(503, "Leitura de QR/codigo requer Pillow e pyzbar instalados no servidor.")
+
+    try:
+        image = Image.open(BytesIO(content))
+        image.load()
+    except Exception as exc:  # pragma: no cover - pillow details vary by backend
+        raise AppError(400, "Nao foi possivel abrir a imagem do anexo.") from exc
+
+    results = []
+    for item in pyzbar_decode(image):
+        raw_value = item.data.decode("utf-8", errors="replace")
+        if not raw_value:
+            continue
+        results.append({"format": item.type or "UNKNOWN", "rawValue": raw_value})
+
+    return results
+
+
 DATA_DIR = resolve_data_dir()
+ATTACHMENTS_DIR = resolve_attachment_dir()
 DATABASE_URL = build_database_url(DATA_DIR)
 DB_PROVIDER = detect_provider(DATABASE_URL)
 LEGACY_STORE_TABLE = assert_table_name(os.getenv("LEGACY_STORE_TABLE", "app_stores"))
+FINANCE_ATTACHMENT_MAX_SIZE = parse_size(os.getenv("FINANCE_ATTACHMENT_MAX_SIZE", "15mb")) or 15 * 1024 * 1024
+FINANCE_REMINDER_LOOKAHEAD_DAYS = max(as_int(os.getenv("FINANCE_REMINDER_LOOKAHEAD_DAYS"), 3), 0)
 
 
 class Base(DeclarativeBase):
@@ -409,6 +602,16 @@ class FinanceTitleAttachment(Base):
     data_url: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class FinanceReminderLog(Base):
+    __tablename__ = "financeiro_reminder_logs"
+
+    reminder_key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    title_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    reminder_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    due_date: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False, default=now_iso)
+
+
 engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
 
 if DATABASE_URL.startswith("sqlite"):
@@ -426,6 +629,213 @@ LEGACY_TABLE_AVAILABLE = inspect(engine).has_table(LEGACY_STORE_TABLE)
 
 def default_finance_config() -> dict[str, Any]:
     return {"tolDias": 3, "tolValor": 0.5, "scoreMin": 60}
+
+
+def br_currency(value: float) -> str:
+    formatted = f"{float(value):,.2f}"
+    return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def normalize_finance_attachment(raw_attachment: Any, title_index: int, attachment_index: int) -> dict[str, Any] | None:
+    if not isinstance(raw_attachment, dict):
+        return None
+
+    payload = decode_attachment_payload(as_text(raw_attachment.get("dataUrl")))
+    data_url = as_text(raw_attachment.get("dataUrl"))
+    if data_url and not data_url.startswith("data:"):
+        data_url = payload.get("dataUrl", "")
+
+    return {
+        "id": as_text(raw_attachment.get("id")) or f"anx-{title_index + 1}-{attachment_index + 1}",
+        "sort_order": attachment_index,
+        "name": as_text(raw_attachment.get("name")),
+        "mime": as_text(raw_attachment.get("mime"), "application/octet-stream") or "application/octet-stream",
+        "dataUrl": data_url,
+        "url": as_text(raw_attachment.get("url")) or payload.get("url", ""),
+        "path": as_text(raw_attachment.get("path")) or payload.get("path", ""),
+        "size": as_int(raw_attachment.get("size"), payload.get("size", 0)),
+        "storage": as_text(raw_attachment.get("storage")) or payload.get("storage", "filesystem"),
+    }
+
+
+def build_attachment_metadata(file_name: str, mime_type: str, relative_path: str, size: int) -> dict[str, Any]:
+    return {
+        "name": file_name,
+        "mime": mime_type or "application/octet-stream",
+        "url": build_attachment_url(relative_path),
+        "path": relative_path,
+        "size": size,
+        "storage": "filesystem",
+        "dataUrl": "",
+    }
+
+
+def save_finance_attachment(*, file_name: str, mime_type: str, vencimento: str, conta_nome: str, pessoa: str, descricao: str, content: bytes) -> dict[str, Any]:
+    folder_name = attachment_folder_name(vencimento)
+    target_dir = ATTACHMENTS_DIR / folder_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    desired_name = build_attachment_filename(vencimento, conta_nome, pessoa, descricao, file_name, mime_type)
+    target_file = ensure_unique_file_path(target_dir, desired_name)
+    target_file.write_bytes(content)
+
+    relative_path = target_file.relative_to(ATTACHMENTS_DIR).as_posix()
+    return build_attachment_metadata(target_file.name, mime_type, relative_path, len(content))
+
+
+def delete_finance_attachment_file(relative_path: str) -> bool:
+    candidate = ensure_within_directory(ATTACHMENTS_DIR, ATTACHMENTS_DIR / relative_path)
+    if not candidate.exists() or not candidate.is_file():
+        return False
+
+    candidate.unlink()
+    cleanup_empty_attachment_dirs(candidate.parent)
+    return True
+
+
+def finance_reminder_subject(reference_date: date) -> str:
+    return f"Financeiro Nanotech | Avisos de vencimento | {reference_date.strftime('%d/%m/%Y')}"
+
+
+def finance_reminder_body(items: list[dict[str, Any]], reference_date: date) -> str:
+    upcoming = [item for item in items if item["type"] == "upcoming"]
+    overdue = [item for item in items if item["type"] == "overdue"]
+
+    lines = [
+        "Avisos de vencimento do Financeiro Nanotech",
+        f"Data de referencia: {reference_date.strftime('%d/%m/%Y')}",
+        "",
+    ]
+
+    if overdue:
+        lines.append("Titulos vencidos:")
+        for item in overdue:
+            lines.append(
+                f"- {item['titulo'].tipo} | venc. {item['titulo'].vencimento} | {item['conta_nome']} | "
+                f"{item['titulo'].pessoa or '-'} | {item['titulo'].descricao} | R$ {br_currency(item['titulo'].valor)}"
+            )
+        lines.append("")
+
+    if upcoming:
+        lines.append(f"Titulos a vencer nos proximos {FINANCE_REMINDER_LOOKAHEAD_DAYS} dia(s):")
+        for item in upcoming:
+            lines.append(
+                f"- {item['titulo'].tipo} | venc. {item['titulo'].vencimento} | {item['conta_nome']} | "
+                f"{item['titulo'].pessoa or '-'} | {item['titulo'].descricao} | R$ {br_currency(item['titulo'].valor)}"
+            )
+        lines.append("")
+
+    lines.append("Mensagem gerada automaticamente pelo sistema.")
+    return "\n".join(lines)
+
+
+def send_email_message(settings: dict[str, Any], subject: str, body: str) -> None:
+    sender = settings["from"] or settings["username"]
+    if not sender:
+        raise AppError(503, "Configure FINANCE_REMINDER_FROM ou SMTP_USER para enviar avisos.")
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = sender
+    message["To"] = ", ".join(settings["to"])
+    message.set_content(body)
+
+    timeout = 20
+    if settings["use_ssl"]:
+        with smtplib.SMTP_SSL(settings["host"], settings["port"], timeout=timeout) as smtp:
+            if settings["username"]:
+                smtp.login(settings["username"], settings["password"])
+            smtp.send_message(message)
+        return
+
+    with smtplib.SMTP(settings["host"], settings["port"], timeout=timeout) as smtp:
+        if settings["use_tls"]:
+            smtp.starttls()
+        if settings["username"]:
+            smtp.login(settings["username"], settings["password"])
+        smtp.send_message(message)
+
+
+def collect_finance_reminders(session, reference_date: date) -> list[dict[str, Any]]:
+    accounts = {
+        account.id: account.nome
+        for account in session.execute(select(FinanceAccount).order_by(FinanceAccount.sort_order, FinanceAccount.id)).scalars().all()
+    }
+    titles = session.execute(select(FinanceTitle).order_by(FinanceTitle.vencimento, FinanceTitle.id)).scalars().all()
+
+    items: list[dict[str, Any]] = []
+    upcoming_limit = reference_date + timedelta(days=FINANCE_REMINDER_LOOKAHEAD_DAYS)
+
+    for title in titles:
+        if title.status != "ABERTO":
+            continue
+
+        due_date = as_date(title.vencimento)
+        if due_date is None:
+            continue
+
+        reminder_type = ""
+        if due_date < reference_date:
+            reminder_type = "overdue"
+        elif due_date <= upcoming_limit:
+            reminder_type = "upcoming"
+        else:
+            continue
+
+        reminder_key = f"{reminder_type}:{title.id}:{title.vencimento}"
+        if session.get(FinanceReminderLog, reminder_key) is not None:
+            continue
+
+        items.append(
+            {
+                "key": reminder_key,
+                "type": reminder_type,
+                "titulo": title,
+                "conta_nome": accounts.get(title.conta_id, "Conta nao informada"),
+            }
+        )
+
+    return items
+
+
+def run_finance_reminders(session) -> dict[str, Any]:
+    settings = finance_mail_settings()
+    if not settings["enabled"]:
+        return {
+            "enabled": False,
+            "sent": 0,
+            "pending": 0,
+            "message": "Avisos por e-mail nao configurados.",
+        }
+
+    reference_date = datetime.now().date()
+    items = collect_finance_reminders(session, reference_date)
+    if not items:
+        return {
+            "enabled": True,
+            "sent": 0,
+            "pending": 0,
+            "message": "Nenhum aviso novo para enviar.",
+        }
+
+    send_email_message(settings, finance_reminder_subject(reference_date), finance_reminder_body(items, reference_date))
+
+    for item in items:
+        session.add(
+            FinanceReminderLog(
+                reminder_key=item["key"],
+                title_id=item["titulo"].id,
+                reminder_type=item["type"],
+                due_date=item["titulo"].vencimento,
+            )
+        )
+
+    return {
+        "enabled": True,
+        "sent": len(items),
+        "pending": len(items),
+        "message": f"{len(items)} aviso(s) enviado(s).",
+    }
 
 
 def ensure_supported_store(store_id: str) -> str:
@@ -666,15 +1076,9 @@ def normalize_finance_state(value: Any) -> dict[str, Any]:
                 "lancId": as_text(raw_title.get("lancId")) or None,
                 "bankTxId": as_text(raw_title.get("bankTxId")) or None,
                 "anexos": [
-                    {
-                        "id": as_text(raw_attachment.get("id")) or f"anx-{index + 1}-{attachment_index + 1}",
-                        "sort_order": attachment_index,
-                        "name": as_text(raw_attachment.get("name")),
-                        "mime": as_text(raw_attachment.get("mime"), "application/octet-stream") or "application/octet-stream",
-                        "dataUrl": as_text(raw_attachment.get("dataUrl")),
-                    }
+                    attachment
                     for attachment_index, raw_attachment in enumerate(raw_title.get("anexos") if isinstance(raw_title.get("anexos"), list) else [])
-                    if isinstance(raw_attachment, dict)
+                    if (attachment := normalize_finance_attachment(raw_attachment, index, attachment_index)) is not None
                 ],
             }
             for index, raw_title in enumerate(raw_titles)
@@ -860,12 +1264,17 @@ def read_finance_store(session) -> dict[str, Any]:
 
     attachments_by_title: dict[str, list[dict[str, Any]]] = {}
     for attachment in attachments:
+        attachment_payload = decode_attachment_payload(attachment.data_url)
         attachments_by_title.setdefault(attachment.title_id, []).append(
             {
                 "id": attachment.id,
                 "name": attachment.name,
                 "mime": attachment.mime,
-                "dataUrl": attachment.data_url,
+                "dataUrl": attachment_payload.get("dataUrl", ""),
+                "url": attachment_payload.get("url", ""),
+                "path": attachment_payload.get("path", ""),
+                "size": attachment_payload.get("size", 0),
+                "storage": attachment_payload.get("storage", "filesystem"),
             }
         )
 
@@ -1058,7 +1467,7 @@ def replace_finance_store(session, value: Any) -> str:
                     sort_order=attachment["sort_order"],
                     name=attachment["name"],
                     mime=attachment["mime"],
-                    data_url=attachment["dataUrl"],
+                    data_url=encode_attachment_payload(attachment),
                 )
             )
 
@@ -1066,6 +1475,7 @@ def replace_finance_store(session, value: Any) -> str:
 
 
 def clear_finance_store(session) -> None:
+    session.execute(delete(FinanceReminderLog))
     session.execute(delete(FinanceReconciliation))
     session.execute(delete(FinanceTitleAttachment))
     session.execute(delete(FinanceTitle))
@@ -1173,6 +1583,7 @@ def healthcheck():
                 "financeiro_reconciliations",
                 "financeiro_titles",
                 "financeiro_title_attachments",
+                "financeiro_reminder_logs",
             ],
         }
 
@@ -1186,6 +1597,88 @@ def get_site_apps():
         updated_at = get_store_updated_at(session, STORE_SITE)
 
     return jsonify({"apps": apps, "updatedAt": updated_at})
+
+
+@app.get("/api/finance/attachments/<path:attachment_path>")
+def get_finance_attachment(attachment_path: str):
+    candidate = ensure_within_directory(ATTACHMENTS_DIR, ATTACHMENTS_DIR / attachment_path)
+    if not candidate.exists() or not candidate.is_file():
+        abort(404)
+    return send_from_directory(candidate.parent, candidate.name)
+
+
+@app.post("/api/finance/attachments")
+def upload_finance_attachment():
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"error": "Selecione um arquivo PDF ou imagem."}), 400
+
+    mime_type = uploaded.mimetype or mimetypes.guess_type(uploaded.filename)[0] or "application/octet-stream"
+    extension = Path(uploaded.filename).suffix.lower()
+    is_allowed = mime_type.startswith("image/") or mime_type == "application/pdf" or extension == ".pdf"
+    if not is_allowed:
+        return jsonify({"error": "Somente PDF e imagens sao permitidos."}), 400
+
+    content = uploaded.read()
+    if not content:
+        return jsonify({"error": "Arquivo vazio."}), 400
+    if len(content) > FINANCE_ATTACHMENT_MAX_SIZE:
+        return jsonify({"error": "Arquivo acima do limite permitido."}), 413
+
+    metadata = save_finance_attachment(
+        file_name=uploaded.filename,
+        mime_type=mime_type,
+        vencimento=as_text(request.form.get("vencimento")),
+        conta_nome=as_text(request.form.get("contaNome")),
+        pessoa=as_text(request.form.get("pessoa")),
+        descricao=as_text(request.form.get("descricao")),
+        content=content,
+    )
+    metadata["id"] = as_text(request.form.get("attachmentId"))
+
+    return jsonify({"ok": True, "attachment": metadata})
+
+
+@app.delete("/api/finance/attachments")
+def delete_finance_attachment():
+    relative_path = as_text(request.args.get("path"))
+    if not relative_path:
+        return jsonify({"error": "Informe o caminho do anexo."}), 400
+
+    deleted = delete_finance_attachment_file(relative_path)
+    if not deleted:
+        abort(404)
+
+    return ("", 204)
+
+
+@app.post("/api/finance/attachments/decode")
+def decode_finance_attachment():
+    body = request.get_json(silent=True) or {}
+    relative_path = as_text(body.get("path"))
+    data_url = as_text(body.get("dataUrl"))
+
+    if relative_path:
+        candidate = ensure_within_directory(ATTACHMENTS_DIR, ATTACHMENTS_DIR / relative_path)
+        if not candidate.exists() or not candidate.is_file():
+            abort(404)
+        content = candidate.read_bytes()
+    elif data_url:
+        content = image_bytes_from_data_url(data_url)
+    else:
+        return jsonify({"error": "Informe o caminho ou a imagem do anexo."}), 400
+
+    codes = decode_image_codes(content)
+    return jsonify({"ok": True, "codes": codes})
+
+
+@app.post("/api/finance/reminders/run")
+def trigger_finance_reminders():
+    with SessionLocal() as session:
+        with session.begin():
+            result = run_finance_reminders(session)
+
+    return jsonify(result)
 
 
 @app.get("/api/stores/<store_id>")

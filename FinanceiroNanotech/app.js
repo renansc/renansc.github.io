@@ -43,10 +43,91 @@ function parseISODate(s){
   return new Date(y, m-1, d);
 }
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function addMonthsISO(baseISO, months){
+  const base = parseISODate(baseISO);
+  const day = base.getDate();
+  const target = new Date(base.getFullYear(), base.getMonth() + months + 1, 0);
+  const finalDay = Math.min(day, target.getDate());
+  return toISODate(new Date(target.getFullYear(), target.getMonth(), finalDay));
+}
+function splitAmount(totalValue, parts){
+  const totalCents = Math.round(Number(totalValue || 0) * 100);
+  const qtd = clamp(Number(parts || 1), 1, 999);
+  const base = Math.floor(totalCents / qtd);
+  let remainder = totalCents - (base * qtd);
+  return Array.from({ length: qtd }, () => {
+    const cents = base + (remainder > 0 ? 1 : 0);
+    remainder = Math.max(0, remainder - 1);
+    return cents / 100;
+  });
+}
+function filePreviewSrc(anexo){
+  return anexo?.dataUrl || anexo?.url || "";
+}
+async function requestJson(url, options={}){
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+    ...options
+  });
+
+  let payload = null;
+  if(response.status !== 204){
+    const text = await response.text();
+    if(text){
+      try{
+        payload = JSON.parse(text);
+      }catch{
+        payload = { error: text };
+      }
+    }
+  }
+
+  if(!response.ok){
+    throw new Error(payload?.error || `Falha na requisição (${response.status}).`);
+  }
+  return payload;
+}
+function getContaNome(contaId){
+  return state.contas.find(c => c.id === contaId)?.nome || "";
+}
+async function uploadTituloAttachment(file, titulo){
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("attachmentId", uid("anx"));
+  formData.set("vencimento", titulo.vencimento || "");
+  formData.set("contaNome", getContaNome(titulo.contaId));
+  formData.set("pessoa", titulo.pessoa || "");
+  formData.set("descricao", titulo.desc || "");
+
+  const payload = await requestJson("/api/finance/attachments", {
+    method: "POST",
+    body: formData
+  });
+  return payload?.attachment || null;
+}
+async function removeTituloAttachmentFile(anexo){
+  if(!anexo?.path) return;
+  await fetch(`/api/finance/attachments?path=${encodeURIComponent(anexo.path)}`, {
+    method: "DELETE",
+    cache: "no-store"
+  });
+}
+async function triggerFinanceReminders({silent=false}={}){
+  const status = $("#statusAvisos");
+  try{
+    const payload = await requestJson("/api/finance/reminders/run", { method: "POST" });
+    if(status) status.textContent = payload?.message || "Avisos processados.";
+    if(!silent && payload?.message) alert(payload.message);
+  }catch(err){
+    if(status) status.textContent = err?.message || "Nao foi possivel processar os avisos.";
+    if(!silent) alert(err?.message || "Nao foi possivel processar os avisos.");
+  }
+}
 
 function saveState(){
   persistLocalState();
-  if(remoteSync) remoteSync.queueSave(state);
+  return remoteSync ? remoteSync.queueSave(state) : Promise.resolve();
 }
 function persistLocalState(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
@@ -1084,7 +1165,7 @@ function novoTitulo({tipo, pessoa, desc, categoriaId, contaId, valor, vencimento
     baixadoEm: null,
     lancId: null,
     bankTxId: null,
-    anexos: [] // [{id,name,mime,dataUrl}]
+    anexos: []
   };
 }
 
@@ -1140,13 +1221,50 @@ function vincularBankTxAoTitulo({tituloId, bankTxId, bankDateISO}){
   }
 }
 
-async function fileToDataUrl(file){
-  return new Promise((resolve, reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(String(r.result));
-    r.onerror=()=>reject(new Error("Falha ao ler arquivo"));
-    r.readAsDataURL(file);
-  });
+async function detectCodesFromAttachment(anexo){
+  const box = $("#anexoCodePreview");
+  if(!box) return;
+
+  if(!anexo){
+    box.textContent = "Selecione uma imagem para tentar ler QR Code ou codigo de barras.";
+    return;
+  }
+  if(!anexo.mime?.startsWith("image/")){
+    box.textContent = "A leitura automatica esta disponivel apenas para anexos de imagem.";
+    return;
+  }
+
+  try{
+    box.textContent = "Lendo codigo da imagem...";
+    const payload = await requestJson("/api/finance/attachments/decode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: anexo.path || "",
+        dataUrl: anexo.path ? "" : (anexo.dataUrl || "")
+      })
+    });
+    const results = payload?.codes || [];
+
+    if(!results.length){
+      box.textContent = "Nenhum QR Code ou codigo de barras foi encontrado na imagem.";
+      return;
+    }
+
+    box.innerHTML = results.map((result, index)=>`
+      <div class="item">
+        <div class="left" style="flex:1">
+          <span class="badge">${escapeHtml(result.format || `COD ${index + 1}`)}</span>
+          <div style="min-width:0">
+            <div><b>${escapeHtml(result.rawValue || "(sem valor)")}</b></div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }catch(err){
+    console.warn("Falha ao ler codigo da imagem:", err);
+    box.textContent = "Nao foi possivel ler QR Code ou codigo de barras deste anexo.";
+  }
 }
 
 function criarTitulosDoOFX({contaId, importId}){
@@ -1327,6 +1445,55 @@ function handleTituloAction(act, id){
 let editTituloId = null;
 let previewAnexoId = null;
 
+function syncParcelamentoUi(){
+  const isNewTitulo = !editTituloId;
+  const enabled = isNewTitulo && $("#tGerarParcelas").checked;
+  const qtdParcelas = clamp(Number($("#tParcelas").value || 2), 2, 60);
+  const valorTotal = Number($("#tValor").value);
+
+  $("#tGerarParcelas").disabled = !isNewTitulo;
+  $("#parcelamentoCampos").classList.toggle("hidden", !enabled);
+  $("#tValorLabel").textContent = enabled ? "Valor total (R$)" : "Valor (R$)";
+  $("#parcelamentoHint").textContent = isNewTitulo
+    ? "Disponivel para novos lancamentos. O valor sera tratado como total."
+    : "Parcelamento fica disponivel apenas na criacao de um novo titulo.";
+
+  if(!$("#tPrimeiraParcela").value){
+    $("#tPrimeiraParcela").value = $("#tVenc").value || toISODate(new Date());
+  }
+
+  if(enabled && Number.isFinite(valorTotal) && valorTotal > 0){
+    const parcelas = splitAmount(valorTotal, qtdParcelas).map(brl);
+    const exemplo = parcelas.slice(0, 3).join(", ");
+    $("#parcelamentoResumo").textContent = `Serao geradas ${qtdParcelas} parcelas mensais. Ex.: ${exemplo}${parcelas.length > 3 ? "..." : ""}`;
+    return;
+  }
+
+  $("#parcelamentoResumo").textContent = "As parcelas serao geradas mensalmente a partir do primeiro vencimento.";
+}
+
+function criarTitulosParcelados(draft){
+  const parcelas = clamp(Number(draft.parcelas || 1), 2, 60);
+  const primeiraParcela = draft.primeiraParcela || draft.vencimento;
+  const valores = splitAmount(draft.valor, parcelas);
+  const createdIds = [];
+
+  for(let index = 0; index < parcelas; index++){
+    const titulo = novoTitulo({
+      ...draft,
+      valor: valores[index],
+      vencimento: addMonthsISO(primeiraParcela, index),
+      desc: `${draft.desc} (${index + 1}/${parcelas})`,
+      obs: [draft.obs, `Parcela ${index + 1}/${parcelas}`].filter(Boolean).join(" | ")
+    });
+    titulo.status = draft.status || "ABERTO";
+    state.titulos.unshift(titulo);
+    createdIds.push(titulo.id);
+  }
+
+  return createdIds;
+}
+
 function openTituloModal(id, tipoDefault="AP"){
   editTituloId = id;
   previewAnexoId = null;
@@ -1346,9 +1513,14 @@ function openTituloModal(id, tipoDefault="AP"){
   $("#tCategoria").value = t?.categoriaId || $("#tCategoria").value;
   $("#tValor").value = t ? Number(t.valor||0) : "";
   $("#tObs").value = t?.obs || "";
+  $("#tGerarParcelas").checked = false;
+  $("#tParcelas").value = 2;
+  $("#tPrimeiraParcela").value = t?.vencimento || $("#tVenc").value;
+  $("#tVenc").dataset.prevValue = $("#tVenc").value;
 
   renderAnexos();
   renderAnexoPreview(null);
+  syncParcelamentoUi();
   updateBaixaButton();
 }
 
@@ -1356,6 +1528,7 @@ function closeTituloModal(){
   $("#modalTitulo").classList.add("hidden");
   editTituloId = null;
   previewAnexoId = null;
+  renderAnexoPreview(null);
 }
 
 function currentTituloDraft(){
@@ -1369,7 +1542,10 @@ function currentTituloDraft(){
     desc: $("#tDesc").value.trim(),
     categoriaId: $("#tCategoria").value,
     valor: Number($("#tValor").value),
-    obs: $("#tObs").value.trim()
+    obs: $("#tObs").value.trim(),
+    gerarParcelas: $("#tGerarParcelas").checked,
+    parcelas: clamp(Number($("#tParcelas").value || 1), 1, 60),
+    primeiraParcela: $("#tPrimeiraParcela").value || $("#tVenc").value
   };
 }
 
@@ -1388,7 +1564,7 @@ function renderAnexos(){
         <span class="badge">${a.mime.includes("pdf") ? "PDF" : "IMG"}</span>
         <div style="min-width:0">
           <div><b>${escapeHtml(a.name)}</b></div>
-          <div class="muted">${escapeHtml(a.mime)}</div>
+          <div class="muted">${escapeHtml(a.mime)}${a.path ? ` - ${escapeHtml(a.path)}` : ""}</div>
         </div>
       </div>
       <div class="row gap">
@@ -1403,20 +1579,40 @@ function renderAnexoPreview(anexo){
   const box = $("#anexoPreview");
   if(!anexo){
     box.innerHTML = `Selecione um anexo para visualizar.`;
+    detectCodesFromAttachment(null);
+    return;
+  }
+  const src = filePreviewSrc(anexo);
+  if(!src){
+    box.textContent = "Arquivo sem URL de visualizacao.";
+    detectCodesFromAttachment(null);
     return;
   }
   if(anexo.mime.includes("pdf")){
-    box.innerHTML = `<iframe src="${anexo.dataUrl}" style="width:100%;height:360px;border:0;border-radius:12px"></iframe>`;
+    box.innerHTML = `<iframe src="${src}" style="width:100%;height:360px;border:0;border-radius:12px"></iframe>`;
+    detectCodesFromAttachment(anexo);
   } else if(anexo.mime.startsWith("image/")){
-    box.innerHTML = `<img src="${anexo.dataUrl}" alt="anexo" style="max-width:100%;border-radius:12px" />`;
+    box.innerHTML = `<img src="${src}" alt="anexo" style="max-width:100%;border-radius:12px" />`;
+    detectCodesFromAttachment(anexo);
   } else {
     box.textContent = "Formato não suportado na prévia.";
+    detectCodesFromAttachment(null);
   }
 }
 
 $("#btnFecharModalTitulo").addEventListener("click", closeTituloModal);
 $("#btnCancelarTitulo").addEventListener("click", closeTituloModal);
 $("#modalTitulo").addEventListener("click",(e)=>{ if(e.target.id==="modalTitulo") closeTituloModal(); });
+$("#tGerarParcelas").addEventListener("change", syncParcelamentoUi);
+$("#tParcelas").addEventListener("input", syncParcelamentoUi);
+$("#tValor").addEventListener("input", syncParcelamentoUi);
+$("#tVenc").addEventListener("change", ()=>{
+  if(!$("#tPrimeiraParcela").value || $("#tPrimeiraParcela").value === $("#tVenc").dataset.prevValue){
+    $("#tPrimeiraParcela").value = $("#tVenc").value;
+  }
+  $("#tVenc").dataset.prevValue = $("#tVenc").value;
+  syncParcelamentoUi();
+});
 
 $("#btnSalvarTitulo").addEventListener("click", ()=>{
   const d = currentTituloDraft();
@@ -1439,6 +1635,16 @@ $("#btnSalvarTitulo").addEventListener("click", ()=>{
     t.centroCusto = d.centroCusto;
     t.obs = d.obs;
   } else {
+    if(d.gerarParcelas && d.parcelas > 1){
+      const createdIds = criarTitulosParcelados(d);
+      editTituloId = createdIds[0] || null;
+      saveState();
+      renderAll();
+      if(editTituloId) openTituloModal(editTituloId, d.tipo);
+      alert(`${createdIds.length} parcelas criadas com sucesso.`);
+      return;
+    }
+
     const t = novoTitulo(d);
     t.status = d.status || "ABERTO";
     state.titulos.unshift(t);
@@ -1470,24 +1676,32 @@ $("#btnAddAnexo").addEventListener("click", async ()=>{
   const file = $("#tAnexoFile").files?.[0];
   if(!file) return alert("Selecione um arquivo (PDF/Imagem).");
 
-  if(file.size > 3 * 1024 * 1024){
-    alert("Arquivo muito grande. Use até 3MB por anexo para não pesar o JSON.");
+  if(file.size > 15 * 1024 * 1024){
+    alert("Arquivo muito grande. Use até 15MB por anexo.");
     return;
   }
 
   const t = state.titulos.find(x=>x.id===editTituloId);
   if(!t) return;
 
-  const dataUrl = await fileToDataUrl(file);
-  t.anexos.push({ id: uid("anx"), name: file.name, mime: file.type || "application/octet-stream", dataUrl });
+  try{
+    const uploaded = await uploadTituloAttachment(file, t);
+    if(!uploaded) throw new Error("Upload nao retornou metadados do anexo.");
+    t.anexos.push(uploaded);
 
-  $("#tAnexoFile").value = "";
-  saveState();
-  renderAll();
-  openTituloModal(editTituloId, t.tipo);
+    $("#tAnexoFile").value = "";
+    await saveState();
+    renderAll();
+    openTituloModal(editTituloId, t.tipo);
+    previewAnexoId = uploaded.id;
+    renderAnexos();
+    renderAnexoPreview(uploaded);
+  }catch(err){
+    alert(err?.message || "Nao foi possivel enviar o anexo.");
+  }
 });
 
-$("#listaAnexos").addEventListener("click", (e)=>{
+$("#listaAnexos").addEventListener("click", async (e)=>{
   const btn = e.target.closest("button");
   if(!btn) return;
   const act = btn.dataset.act;
@@ -1503,9 +1717,15 @@ $("#listaAnexos").addEventListener("click", (e)=>{
   }
   if(act==="del"){
     if(confirm("Remover anexo?")){
+      const anexo = t.anexos.find(x=>x.id===id);
       t.anexos = t.anexos.filter(x=>x.id!==id);
       if(previewAnexoId===id){ previewAnexoId=null; renderAnexoPreview(null); }
-      saveState();
+      try{
+        await removeTituloAttachmentFile(anexo);
+      }catch(err){
+        console.warn("Falha ao remover arquivo fisico do anexo:", err);
+      }
+      await saveState();
       renderAnexos();
     }
   }
@@ -1524,6 +1744,7 @@ $("#btnSalvarCfg").addEventListener("click", ()=>{
   saveState();
   alert("Config salva.");
 });
+$("#btnRodarAvisos")?.addEventListener("click", ()=> triggerFinanceReminders());
 
 /* ---------- Backup JSON ---------- */
 $("#btnExportJSON").addEventListener("click", ()=>{
@@ -1565,6 +1786,7 @@ $("#btnReset").addEventListener("click", ()=>{
   $("#dashConta").value = "ALL";
   $("#fConta").value = "ALL";
   renderAll();
+  triggerFinanceReminders({ silent: true });
 
   window.addEventListener("storage", (e)=>{
     if(e.key !== LS_KEY || !e.newValue) return;

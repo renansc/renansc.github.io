@@ -10,8 +10,7 @@
   <header class="topbar">
     <div class="brand">
       <div class="logo">
-        <!-- Troque "logo.png" pelo nome do seu arquivo -->
-        <img src="logo.png" alt="Logo" onerror="this.style.display='none'; this.parentElement.textContent='R$';" />
+        <img src="logo.png" alt="Logo Nanotech" onerror="this.style.display='none'; this.parentElement.textContent='R$';" />
       </div>
       <div>
         <div class="title">Gestão Financeira</div>
@@ -436,13 +435,32 @@
             <select id="tCategoria"></select>
           </label>
 
-          <label>Valor (R$)
+          <label><span id="tValorLabel">Valor (R$)</span>
             <input type="number" id="tValor" step="0.01" inputmode="decimal">
           </label>
 
           <label class="span2">Observação
             <input type="text" id="tObs" placeholder="Opcional">
           </label>
+
+          <div class="span2 sectionBox" id="parcelamentoBox">
+            <div class="row gap wrap" style="justify-content:space-between">
+              <label class="toggleLabel">
+                <input type="checkbox" id="tGerarParcelas" />
+                <span>Gerar parcelas de uma vez</span>
+              </label>
+              <div class="muted" id="parcelamentoHint">Disponível para novos lançamentos. O valor será tratado como total.</div>
+            </div>
+            <div class="formGrid nestedGrid" id="parcelamentoCampos">
+              <label>Qtd. parcelas
+                <input type="number" id="tParcelas" min="2" max="60" value="2" inputmode="numeric">
+              </label>
+              <label>Primeira parcela
+                <input type="date" id="tPrimeiraParcela">
+              </label>
+            </div>
+            <div class="muted" id="parcelamentoResumo">As parcelas serão geradas mensalmente a partir do primeiro vencimento.</div>
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -460,6 +478,9 @@
           <div style="flex:1">
             <div class="muted" style="margin-bottom:6px"><b>Prévia</b></div>
             <div class="previewBox" id="anexoPreview">Selecione um anexo para visualizar.</div>
+            <div class="divider"></div>
+            <div class="muted" style="margin-bottom:6px"><b>QR / Código de barras</b></div>
+            <div class="previewBox codeBox" id="anexoCodePreview">Selecione uma imagem para tentar ler QR Code ou código de barras.</div>
           </div>
         </div>
 
@@ -520,6 +541,22 @@
 
           <div class="muted" style="margin-top:10px">
             Sugestão: tol dias 3, tol valor 0,50, score mínimo 60.
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="cardhead">
+            <h2>Avisos por e-mail</h2>
+            <div class="muted">Usa SMTP configurado no servidor para avisar sobre vencimentos.</div>
+          </div>
+
+          <div class="row gap wrap">
+            <button class="btn primary" id="btnRodarAvisos">Enviar avisos agora</button>
+            <span class="muted" id="statusAvisos">O sistema tenta disparar os avisos ao abrir a tela e tambem permite agendamento externo.</span>
+          </div>
+
+          <div class="muted" style="margin-top:10px">
+            Configure no servidor: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FINANCE_REMINDER_TO e FINANCE_REMINDER_FROM.
           </div>
         </div>
       </div>
