@@ -25,6 +25,7 @@
       <button class="tab" data-view="categorias">Categorias</button>
       <button class="tab" data-view="importar">Importar OFX</button>
       <button class="tab" data-view="conciliacao">Conciliação</button>
+      <button class="tab" data-view="compras">Compras</button>
       <button class="tab" data-view="pagar">Contas a Pagar</button>
       <button class="tab" data-view="receber">Contas a Receber</button>
       <button class="tab" data-view="config">Config</button>
@@ -333,6 +334,7 @@
                 <th>Centro de custo</th>
                 <th>Fornecedor</th>
                 <th>Descrição</th>
+                <th>Pagamento</th>
                 <th class="right">Valor</th>
                 <th>Status</th>
                 <th>Anexos</th>
@@ -375,6 +377,7 @@
                 <th>Centro de custo</th>
                 <th>Cliente</th>
                 <th>Descrição</th>
+                <th>Pagamento</th>
                 <th class="right">Valor</th>
                 <th>Status</th>
                 <th>Anexos</th>
@@ -383,6 +386,127 @@
             </thead>
             <tbody id="tbAR"></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOLICITACOES DE COMPRA -->
+    <section class="view hidden" id="view-compras">
+      <div class="card">
+        <div class="cardhead">
+          <h2>Solicitacoes de compra</h2>
+          <div class="row gap wrap">
+            <select id="cpStatus">
+              <option value="ALL">Todos</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="APROVADO">Aprovado</option>
+              <option value="REPROVADO">Reprovado</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+            <input type="text" id="cpBusca" placeholder="Buscar produto, fornecedor ou justificativa..." />
+            <button class="btn" id="btnFiltrarCompras">Filtrar</button>
+            <button class="btn primary" id="btnNovaCompra">+ Nova solicitacao</button>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Solic.</th>
+                <th>Produto</th>
+                <th>Fornecedor</th>
+                <th>Conta</th>
+                <th>Pagamento</th>
+                <th>Venc.</th>
+                <th class="right">Valor</th>
+                <th>Status</th>
+                <th>AP</th>
+                <th class="right">Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="tbCompras"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal hidden" id="modalCompra">
+        <div class="modalBox">
+          <div class="modalHead">
+            <h3 id="modalCompraTitle">Nova solicitacao de compra</h3>
+            <button class="iconBtn" id="btnFecharModalCompra">×</button>
+          </div>
+
+          <div class="formGrid">
+            <label>Data da solicitacao
+              <input type="date" id="pcData">
+            </label>
+            <label>Fornecedor
+              <input type="text" id="pcFornecedor" placeholder="Ex.: Loja X, Mercado Y...">
+            </label>
+
+            <label class="span2">Produto / servico
+              <input type="text" id="pcDesc" placeholder="Ex.: Notebook, toner, assinatura, equipamento...">
+            </label>
+
+            <label>Link do produto
+              <input type="url" id="pcProdutoUrl" placeholder="https://...">
+            </label>
+            <label>Foto do produto (URL)
+              <input type="url" id="pcFotoUrl" placeholder="https://.../imagem.jpg">
+            </label>
+
+            <label class="span2">Justificativa
+              <textarea id="pcJustificativa" rows="4" placeholder="Explique por que a compra precisa ser aprovada."></textarea>
+            </label>
+
+            <label>Conta do contas a pagar
+              <select id="pcConta"></select>
+            </label>
+            <label>Categoria
+              <select id="pcCategoria"></select>
+            </label>
+
+            <label>Centro de custo
+              <input type="text" id="pcCentroCusto" placeholder="Ex.: Administrativo, Operacao...">
+            </label>
+            <label>Forma de pagamento
+              <input type="text" id="pcFormaPagamento" placeholder="Ex.: PIX, boleto, cartao, transferencia...">
+            </label>
+
+            <label>Vencimento
+              <input type="date" id="pcVenc">
+            </label>
+            <label>Valor estimado (R$)
+              <input type="number" id="pcValor" step="0.01" inputmode="decimal">
+            </label>
+
+            <label class="span2">Observacoes internas
+              <textarea id="pcObs" rows="3" placeholder="Informacoes adicionais da solicitacao."></textarea>
+            </label>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="grid2">
+            <div class="previewBox">
+              <div class="muted" style="margin-bottom:6px"><b>Imagem do produto</b></div>
+              <div id="compraFotoPreview" class="muted">Informe uma URL de imagem para visualizar a foto do produto.</div>
+            </div>
+            <div class="previewBox">
+              <div class="muted" style="margin-bottom:6px"><b>Link e status</b></div>
+              <div id="compraLinkPreview" class="muted">Informe o link do produto para facilitar a aprovacao.</div>
+              <div class="divider"></div>
+              <div id="compraStatusInfo" class="muted">A solicitacao nasce como pendente. A aprovacao gera automaticamente um titulo em contas a pagar.</div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row end gap wrap">
+            <button class="btn" id="btnCancelarCompra">Cancelar</button>
+            <button class="btn primary" id="btnSalvarCompra">Salvar solicitacao</button>
+          </div>
         </div>
       </div>
     </section>
@@ -439,6 +563,10 @@
             <input type="number" id="tValor" step="0.01" inputmode="decimal">
           </label>
 
+          <label>Forma de pagamento
+            <input type="text" id="tFormaPagamento" placeholder="Ex.: PIX, boleto, transferencia, cartao...">
+          </label>
+
           <label class="span2">Observação
             <input type="text" id="tObs" placeholder="Opcional">
           </label>
@@ -467,7 +595,7 @@
 
         <div class="row gap wrap" style="align-items:flex-start">
           <div style="flex:1">
-            <div class="muted" style="margin-bottom:6px"><b>Anexos</b> (PDF/Imagem). Ficam no JSON (base64).</div>
+            <div class="muted" style="margin-bottom:6px"><b>Anexos</b> (PDF/Imagem). Ficam salvos na pasta dados/ do servidor.</div>
             <div class="row gap wrap">
               <input type="file" id="tAnexoFile" accept=".pdf,image/*" />
               <button class="btn" id="btnAddAnexo">Adicionar anexo</button>
@@ -479,8 +607,8 @@
             <div class="muted" style="margin-bottom:6px"><b>Prévia</b></div>
             <div class="previewBox" id="anexoPreview">Selecione um anexo para visualizar.</div>
             <div class="divider"></div>
-            <div class="muted" style="margin-bottom:6px"><b>QR / Código de barras</b></div>
-            <div class="previewBox codeBox" id="anexoCodePreview">Selecione uma imagem para tentar ler QR Code ou código de barras.</div>
+            <div class="muted" style="margin-bottom:6px"><b>QR / código / linha digitável</b></div>
+            <div class="previewBox codeBox" id="anexoCodePreview">Selecione uma imagem ou PDF para tentar ler QR Code, linha digitável ou código de barras.</div>
           </div>
         </div>
 

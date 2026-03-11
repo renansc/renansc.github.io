@@ -129,8 +129,8 @@ body{
 .end{ justify-content:flex-end; }
 .gap{ gap: 10px; }
 
-input, select, button{ font: inherit; max-width:100%; }
-input, select{
+input, select, textarea, button{ font: inherit; max-width:100%; }
+input, select, textarea{
   background: rgba(15,23,48,.7);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -139,6 +139,10 @@ input, select{
   outline:none;
 }
 input::placeholder{ color: rgba(174,183,231,.65); }
+textarea{
+  resize: vertical;
+  min-height: 96px;
+}
 
 .btn{
   border:1px solid var(--line);
@@ -343,6 +347,11 @@ input::placeholder{ color: rgba(174,183,231,.65); }
   background: rgba(15,23,48,.55);
   padding: 10px;
   overflow:auto;
+}
+.previewBox img{
+  max-width:100%;
+  border-radius: 12px;
+  display:block;
 }
 
 .footer{

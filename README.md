@@ -65,6 +65,7 @@ Os dados nao ficam mais em um `payload` generico. O backend grava em tabelas ded
 - `financeiro_reconciliations`
 - `financeiro_titles`
 - `financeiro_title_attachments`
+- `financeiro_purchase_requests`
 - `financeiro_reminder_logs`
 
 Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical` e `financeiro-nanotech` no startup.
@@ -78,7 +79,17 @@ Os anexos de contas a pagar/receber sao enviados para a pasta `dados/` por padra
 - Use `FINANCE_ATTACHMENTS_DIR` para trocar o destino dos arquivos.
 - Se quiser aproveitar uma pasta sincronizada do Google Drive, aponte `FINANCE_ATTACHMENTS_DIR` para esse diretorio montado/sincronizado.
 - Os arquivos sao organizados em subpastas `YYYY-MM` conforme o vencimento.
-- A leitura de QR Code e codigo de barras roda no Flask/Python via `Pillow` + `pyzbar`.
+- A leitura de QR Code, codigo de barras e linha digitavel roda no Flask/Python via `Pillow` + `pyzbar` + `PyMuPDF`.
+- Em Linux/WSL e em deploy, instale tambem a biblioteca nativa `libzbar0`.
+
+## Compras e aprovacao
+
+O financeiro agora inclui a aba de solicitacoes de compra:
+
+- cadastra produto/servico, fornecedor, link do produto, foto por URL, justificativa, conta, categoria, vencimento e forma de pagamento
+- a solicitacao fica `PENDENTE` ate aprovacao
+- ao aprovar, o sistema gera automaticamente o titulo em `Contas a Pagar`
+- alteracoes posteriores na solicitacao mantem o AP vinculado atualizado
 
 ## Avisos por e-mail
 

@@ -23,9 +23,15 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from werkzeug.exceptions import HTTPException
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:  # pragma: no cover - optional dependency
     Image = None
+    ImageOps = None
+
+try:
+    import fitz
+except ImportError:  # pragma: no cover - optional dependency
+    fitz = None
 
 try:
     from pyzbar.pyzbar import decode as pyzbar_decode
@@ -401,32 +407,135 @@ def image_bytes_from_data_url(data_url: str) -> bytes:
 
     header, encoded = payload.split(",", 1)
     if ";base64" not in header:
-        raise AppError(400, "A imagem precisa estar em base64.")
+        raise AppError(400, "O arquivo precisa estar em base64.")
 
     try:
         return base64.b64decode(encoded, validate=True)
     except binascii.Error as exc:
-        raise AppError(400, "Falha ao decodificar a imagem enviada.") from exc
+        raise AppError(400, "Falha ao decodificar o arquivo enviado.") from exc
 
 
-def decode_image_codes(content: bytes) -> list[dict[str, str]]:
+def append_detected_codes(
+    results: list[dict[str, str]], seen: set[tuple[str, str]], candidates: list[dict[str, str]]
+) -> None:
+    for item in candidates:
+        raw_value = as_text(item.get("rawValue"))
+        code_type = as_text(item.get("format"), "UNKNOWN") or "UNKNOWN"
+        key = (code_type, raw_value)
+        if not raw_value or key in seen:
+            continue
+        seen.add(key)
+        results.append({"format": code_type, "rawValue": raw_value})
+
+
+def build_code_image_variants(image: Image.Image) -> list[Image.Image]:
+    if Image is None:
+        return []
+
+    base = image.convert("RGB")
+    grayscale = base.convert("L")
+    variants: list[Image.Image] = [base, grayscale]
+
+    if ImageOps is not None:
+        variants.append(ImageOps.autocontrast(grayscale))
+
+    resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS", getattr(Image, "LANCZOS", 1))
+    max_side = max(base.size)
+    scales = (2, 3) if max_side <= 1400 else (2,) if max_side <= 2400 else ()
+    for scale in scales:
+        resized = base.resize((base.width * scale, base.height * scale), resampling)
+        resized_gray = resized.convert("L")
+        variants.extend([resized, resized_gray])
+        if ImageOps is not None:
+            variants.append(ImageOps.autocontrast(resized_gray))
+
+    return variants
+
+
+def decode_codes_from_image(image: Image.Image) -> list[dict[str, str]]:
     if Image is None or pyzbar_decode is None:
         raise AppError(503, "Leitura de QR/codigo requer Pillow e pyzbar instalados no servidor.")
 
+    results: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for candidate in build_code_image_variants(image):
+        decoded_items = []
+        for item in pyzbar_decode(candidate):
+            decoded_items.append(
+                {
+                    "format": item.type or "UNKNOWN",
+                    "rawValue": item.data.decode("utf-8", errors="replace"),
+                }
+            )
+        append_detected_codes(results, seen, decoded_items)
+        if results:
+            return results
+
+    return results
+
+
+def extract_payment_codes_from_text(text: str) -> list[dict[str, str]]:
+    normalized = as_text(text)
+    if not normalized:
+        return []
+
+    results: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for match in re.finditer(r"(?:\d[\d\.\s-]{40,90}\d)", normalized):
+        digits = re.sub(r"\D", "", match.group(0))
+        if len(digits) not in {44, 46, 47, 48}:
+            continue
+        code_type = "LINHA_DIGITAVEL" if len(digits) >= 46 else "CODIGO_DE_BARRAS"
+        append_detected_codes(results, seen, [{"format": code_type, "rawValue": digits}])
+
+    return results
+
+def decode_image_codes(content: bytes) -> list[dict[str, str]]:
+    if Image is None:
+        raise AppError(503, "Leitura de imagem requer Pillow instalado no servidor.")
     try:
         image = Image.open(BytesIO(content))
         image.load()
     except Exception as exc:  # pragma: no cover - pillow details vary by backend
         raise AppError(400, "Nao foi possivel abrir a imagem do anexo.") from exc
 
-    results = []
-    for item in pyzbar_decode(image):
-        raw_value = item.data.decode("utf-8", errors="replace")
-        if not raw_value:
-            continue
-        results.append({"format": item.type or "UNKNOWN", "rawValue": raw_value})
+    return decode_codes_from_image(image)
 
-    return results
+
+def decode_pdf_codes(content: bytes) -> list[dict[str, str]]:
+    if fitz is None:
+        raise AppError(503, "Leitura de PDF requer PyMuPDF instalado no servidor.")
+
+    try:
+        document = fitz.open(stream=content, filetype="pdf")
+    except Exception as exc:  # pragma: no cover - fitz backend specific
+        raise AppError(400, "Nao foi possivel abrir o PDF do anexo.") from exc
+
+    try:
+        results: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        page_limit = min(len(document), 5)
+        for page_index in range(page_limit):
+            page = document.load_page(page_index)
+            append_detected_codes(results, seen, extract_payment_codes_from_text(page.get_text("text")))
+
+        if results or Image is None or pyzbar_decode is None:
+            return results
+
+        for page_index in range(page_limit):
+            page = document.load_page(page_index)
+            for zoom in (2, 3):
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+                image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+                append_detected_codes(results, seen, decode_codes_from_image(image))
+                if results:
+                    break
+            if results:
+                break
+
+        return results
+    finally:
+        document.close()
 
 
 DATA_DIR = resolve_data_dir()
@@ -600,6 +709,30 @@ class FinanceTitleAttachment(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     mime: Mapped[str] = mapped_column(String(255), nullable=False, default="application/octet-stream")
     data_url: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class FinancePurchaseRequest(Base):
+    __tablename__ = "financeiro_purchase_requests"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    requested_at: Mapped[str] = mapped_column(String(32), nullable=False, default=now_iso)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDENTE")
+    descricao: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    fornecedor: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    produto_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    foto_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    justificativa: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    categoria_id: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    conta_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    centro_custo: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    valor: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    vencimento: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    forma_pagamento: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    observacoes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    title_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    approved_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    rejected_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class FinanceReminderLog(Base):
@@ -979,6 +1112,7 @@ def normalize_finance_state(value: Any) -> dict[str, Any]:
     raw_imports = data.get("imports") if isinstance(data.get("imports"), list) else []
     raw_reconciliations = data.get("reconciliations") if isinstance(data.get("reconciliations"), list) else []
     raw_titles = data.get("titulos") if isinstance(data.get("titulos"), list) else []
+    raw_purchases = data.get("compras") if isinstance(data.get("compras"), list) else []
 
     return {
         "config": {
@@ -1083,6 +1217,31 @@ def normalize_finance_state(value: Any) -> dict[str, Any]:
             }
             for index, raw_title in enumerate(raw_titles)
             if isinstance(raw_title, dict)
+        ],
+        "compras": [
+            {
+                "id": as_text(raw_purchase.get("id")) or f"compra-{index + 1}",
+                "sort_order": index,
+                "requestedAt": as_text(raw_purchase.get("requestedAt")) or now_iso(),
+                "status": as_text(raw_purchase.get("status"), "PENDENTE") or "PENDENTE",
+                "desc": as_text(raw_purchase.get("desc")),
+                "fornecedor": as_text(raw_purchase.get("fornecedor")),
+                "produtoUrl": as_text(raw_purchase.get("produtoUrl")),
+                "fotoUrl": as_text(raw_purchase.get("fotoUrl")),
+                "justificativa": as_text(raw_purchase.get("justificativa")),
+                "categoriaId": as_text(raw_purchase.get("categoriaId")),
+                "contaId": as_text(raw_purchase.get("contaId")),
+                "centroCusto": as_text(raw_purchase.get("centroCusto")),
+                "valor": as_float(raw_purchase.get("valor"), 0.0),
+                "vencimento": as_text(raw_purchase.get("vencimento")),
+                "formaPagamento": as_text(raw_purchase.get("formaPagamento")),
+                "obs": as_text(raw_purchase.get("obs")),
+                "titleId": as_text(raw_purchase.get("titleId")) or None,
+                "approvedAt": as_text(raw_purchase.get("approvedAt")) or None,
+                "rejectedAt": as_text(raw_purchase.get("rejectedAt")) or None,
+            }
+            for index, raw_purchase in enumerate(raw_purchases)
+            if isinstance(raw_purchase, dict)
         ],
     }
 
@@ -1241,6 +1400,9 @@ def read_finance_store(session) -> dict[str, Any]:
         select(FinanceReconciliation).order_by(FinanceReconciliation.sort_order, FinanceReconciliation.bank_tx_id)
     ).scalars().all()
     titles = session.execute(select(FinanceTitle).order_by(FinanceTitle.sort_order, FinanceTitle.id)).scalars().all()
+    purchases = session.execute(
+        select(FinancePurchaseRequest).order_by(FinancePurchaseRequest.sort_order, FinancePurchaseRequest.id)
+    ).scalars().all()
     attachments = session.execute(
         select(FinanceTitleAttachment).order_by(
             FinanceTitleAttachment.title_id,
@@ -1336,6 +1498,29 @@ def read_finance_store(session) -> dict[str, Any]:
             }
             for title in titles
         ],
+        "compras": [
+            {
+                "id": purchase.id,
+                "requestedAt": purchase.requested_at,
+                "status": purchase.status,
+                "desc": purchase.descricao,
+                "fornecedor": purchase.fornecedor,
+                "produtoUrl": purchase.produto_url,
+                "fotoUrl": purchase.foto_url,
+                "justificativa": purchase.justificativa,
+                "categoriaId": purchase.categoria_id,
+                "contaId": purchase.conta_id,
+                "centroCusto": purchase.centro_custo,
+                "valor": purchase.valor,
+                "vencimento": purchase.vencimento,
+                "formaPagamento": purchase.forma_pagamento,
+                "obs": purchase.observacoes,
+                "titleId": purchase.title_id,
+                "approvedAt": purchase.approved_at,
+                "rejectedAt": purchase.rejected_at,
+            }
+            for purchase in purchases
+        ],
         "config": {
             "tolDias": config.tol_dias if config is not None else cfg["tolDias"],
             "tolValor": config.tol_valor if config is not None else cfg["tolValor"],
@@ -1349,6 +1534,7 @@ def replace_finance_store(session, value: Any) -> str:
 
     session.execute(delete(FinanceReconciliation))
     session.execute(delete(FinanceTitleAttachment))
+    session.execute(delete(FinancePurchaseRequest))
     session.execute(delete(FinanceTitle))
     session.execute(delete(FinanceBankTransaction))
     session.execute(delete(FinanceImport))
@@ -1471,6 +1657,31 @@ def replace_finance_store(session, value: Any) -> str:
                 )
             )
 
+    for purchase in state["compras"]:
+        session.add(
+            FinancePurchaseRequest(
+                id=purchase["id"],
+                sort_order=purchase["sort_order"],
+                requested_at=purchase["requestedAt"],
+                status=purchase["status"],
+                descricao=purchase["desc"],
+                fornecedor=purchase["fornecedor"],
+                produto_url=purchase["produtoUrl"],
+                foto_url=purchase["fotoUrl"],
+                justificativa=purchase["justificativa"],
+                categoria_id=purchase["categoriaId"],
+                conta_id=purchase["contaId"],
+                centro_custo=purchase["centroCusto"],
+                valor=purchase["valor"],
+                vencimento=purchase["vencimento"],
+                forma_pagamento=purchase["formaPagamento"],
+                observacoes=purchase["obs"],
+                title_id=purchase["titleId"],
+                approved_at=purchase["approvedAt"],
+                rejected_at=purchase["rejectedAt"],
+            )
+        )
+
     return touch_store(session, STORE_FINANCE)
 
 
@@ -1478,6 +1689,7 @@ def clear_finance_store(session) -> None:
     session.execute(delete(FinanceReminderLog))
     session.execute(delete(FinanceReconciliation))
     session.execute(delete(FinanceTitleAttachment))
+    session.execute(delete(FinancePurchaseRequest))
     session.execute(delete(FinanceTitle))
     session.execute(delete(FinanceBankTransaction))
     session.execute(delete(FinanceImport))
@@ -1583,6 +1795,7 @@ def healthcheck():
                 "financeiro_reconciliations",
                 "financeiro_titles",
                 "financeiro_title_attachments",
+                "financeiro_purchase_requests",
                 "financeiro_reminder_logs",
             ],
         }
@@ -1657,18 +1870,22 @@ def decode_finance_attachment():
     body = request.get_json(silent=True) or {}
     relative_path = as_text(body.get("path"))
     data_url = as_text(body.get("dataUrl"))
+    mime_type = as_text(body.get("mime")).lower()
+    file_name = ""
 
     if relative_path:
         candidate = ensure_within_directory(ATTACHMENTS_DIR, ATTACHMENTS_DIR / relative_path)
         if not candidate.exists() or not candidate.is_file():
             abort(404)
         content = candidate.read_bytes()
+        file_name = candidate.name
     elif data_url:
         content = image_bytes_from_data_url(data_url)
     else:
         return jsonify({"error": "Informe o caminho ou a imagem do anexo."}), 400
 
-    codes = decode_image_codes(content)
+    is_pdf = "pdf" in mime_type or file_name.lower().endswith(".pdf")
+    codes = decode_pdf_codes(content) if is_pdf else decode_image_codes(content)
     return jsonify({"ok": True, "codes": codes})
 
 

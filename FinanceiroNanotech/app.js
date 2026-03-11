@@ -151,6 +151,7 @@ function migrate(d){
   if(!d.categorias) d.categorias = [];
   if(!d.contas) d.contas = [];
   if(!d.titulos) d.titulos = [];
+  if(!d.compras) d.compras = [];
   return d;
 }
 function seed(){
@@ -170,6 +171,7 @@ function seed(){
     imports: [],
     reconciliations: [],
     titulos: [],
+    compras: [],
     config: { tolDias: 3, tolValor: 0.5, scoreMin: 60 }
   };
 }
@@ -181,6 +183,42 @@ function escapeHtml(str){
     .replaceAll(">","&gt;")
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
+}
+
+const TITLE_META_MARKER = "\n__GF_META__:";
+
+function parseTitleObs(obs){
+  const raw = String(obs || "");
+  const markerIndex = raw.indexOf(TITLE_META_MARKER);
+  if(markerIndex < 0){
+    return { text: raw.trim(), meta: {} };
+  }
+
+  const text = raw.slice(0, markerIndex).trim();
+  const metaRaw = raw.slice(markerIndex + TITLE_META_MARKER.length);
+  try{
+    const meta = JSON.parse(metaRaw);
+    return { text, meta: (meta && typeof meta === "object") ? meta : {} };
+  }catch{
+    return { text: raw.trim(), meta: {} };
+  }
+}
+
+function buildTitleObs(text, meta={}){
+  const cleanText = String(text || "").trim();
+  const cleanMeta = Object.fromEntries(
+    Object.entries(meta).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+  );
+  if(!Object.keys(cleanMeta).length) return cleanText;
+  return `${cleanText}${cleanText ? "\n" : ""}${TITLE_META_MARKER}${JSON.stringify(cleanMeta)}`;
+}
+
+function getTituloFormaPagamento(titulo){
+  return parseTitleObs(titulo?.obs).meta.formaPagamento || "";
+}
+
+function getCompraByTituloId(tituloId){
+  return state.compras.find(compra => compra.titleId === tituloId) || null;
 }
 
 /* ---------- Navegação ---------- */
@@ -205,6 +243,7 @@ function renderAll(){
   renderCategorias();
   renderImportPreview();
   renderConciliacao();
+  renderCompras();
   renderAPAR();
   renderConfig();
 }
@@ -232,12 +271,14 @@ function fillSelects(){
     apConta: $("#apConta")?.value,
     arConta: $("#arConta")?.value,
     tConta: $("#tConta")?.value,
+    pcConta: $("#pcConta")?.value,
 
     lTipo: $("#lTipo")?.value,
     lCategoria: $("#lCategoria")?.value,
 
     tTipo: $("#tTipo")?.value,
-    tCategoria: $("#tCategoria")?.value
+    tCategoria: $("#tCategoria")?.value,
+    pcCategoria: $("#pcCategoria")?.value
   };
 
   const contaOptions = (includeAll=false) => {
@@ -260,6 +301,7 @@ function fillSelects(){
   $("#apConta").innerHTML = contaOptions(true);
   $("#arConta").innerHTML = contaOptions(true);
   $("#tConta").innerHTML  = contaOptions(false);
+  if($("#pcConta")) $("#pcConta").innerHTML = contaOptions(false);
 
   safeRestoreSelect("#dashConta", prev.dashConta ?? "ALL");
   safeRestoreSelect("#fConta", prev.fConta ?? "ALL");
@@ -270,6 +312,7 @@ function fillSelects(){
   safeRestoreSelect("#apConta", prev.apConta ?? "ALL");
   safeRestoreSelect("#arConta", prev.arConta ?? "ALL");
   safeRestoreSelect("#tConta", prev.tConta ?? (contas[0]?.id || ""));
+  safeRestoreSelect("#pcConta", prev.pcConta ?? (contas[0]?.id || ""));
 
   // categorias do modal de lançamento dependem do tipo
   const tipoLanc = $("#lTipo").value || prev.lTipo || "DESPESA";
@@ -285,6 +328,12 @@ function fillSelects(){
   const catsTit = cats.filter(c => c.tipo === tipoCatTit);
   $("#tCategoria").innerHTML = catsTit.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("");
   safeRestoreSelect("#tCategoria", prev.tCategoria ?? (catsTit[0]?.id || ""));
+
+  const catsCompra = cats.filter(c => c.tipo === "DESPESA");
+  if($("#pcCategoria")){
+    $("#pcCategoria").innerHTML = catsCompra.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("");
+    safeRestoreSelect("#pcCategoria", prev.pcCategoria ?? (catsCompra[0]?.id || ""));
+  }
 }
 
 $("#lTipo").addEventListener("change", fillSelects);
@@ -556,6 +605,7 @@ $("#listaContas").addEventListener("click", (e)=>{
     if(confirm("Excluir esta conta? (lançamentos, títulos e imports dessa conta também serão removidos)")){
       state.lancamentos = state.lancamentos.filter(l => l.contaId !== id);
       state.titulos = state.titulos.filter(t => t.contaId !== id);
+      state.compras = state.compras.filter(c => c.contaId !== id);
       state.imports = state.imports.filter(i => i.contaId !== id);
 
       // remove reconciliations órfãos
@@ -1226,28 +1276,34 @@ async function detectCodesFromAttachment(anexo){
   if(!box) return;
 
   if(!anexo){
-    box.textContent = "Selecione uma imagem para tentar ler QR Code ou codigo de barras.";
+    box.textContent = "Selecione uma imagem ou PDF para tentar ler QR Code, linha digitavel ou codigo de barras.";
     return;
   }
-  if(!anexo.mime?.startsWith("image/")){
-    box.textContent = "A leitura automatica esta disponivel apenas para anexos de imagem.";
+  const mime = anexo.mime || "";
+  const isImage = mime.startsWith("image/");
+  const isPdf = mime.includes("pdf");
+  if(!isImage && !isPdf){
+    box.textContent = "A leitura automatica esta disponivel para anexos de imagem e PDF.";
     return;
   }
 
   try{
-    box.textContent = "Lendo codigo da imagem...";
+    box.textContent = isPdf ? "Lendo codigo do PDF..." : "Lendo codigo da imagem...";
     const payload = await requestJson("/api/finance/attachments/decode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         path: anexo.path || "",
-        dataUrl: anexo.path ? "" : (anexo.dataUrl || "")
+        dataUrl: anexo.path ? "" : (anexo.dataUrl || ""),
+        mime: anexo.mime || ""
       })
     });
     const results = payload?.codes || [];
 
     if(!results.length){
-      box.textContent = "Nenhum QR Code ou codigo de barras foi encontrado na imagem.";
+      box.textContent = isPdf
+        ? "Nenhum QR Code, linha digitavel ou codigo de barras foi encontrado nas primeiras paginas do PDF."
+        : "Nenhum QR Code ou codigo de barras foi encontrado na imagem.";
       return;
     }
 
@@ -1262,8 +1318,8 @@ async function detectCodesFromAttachment(anexo){
       </div>
     `).join("");
   }catch(err){
-    console.warn("Falha ao ler codigo da imagem:", err);
-    box.textContent = "Nao foi possivel ler QR Code ou codigo de barras deste anexo.";
+    console.warn("Falha ao ler codigo do anexo:", err);
+    box.textContent = "Nao foi possivel ler QR Code, linha digitavel ou codigo de barras deste anexo.";
   }
 }
 
@@ -1338,6 +1394,300 @@ $("#btnCriarTitulosDoOFX").addEventListener("click", ()=>{
   alert(`Criados ${qtd} título(s) a partir do OFX.`);
 });
 
+/* ---------- Compras ---------- */
+let editCompraId = null;
+
+function novoPedidoCompra({requestedAt, desc, fornecedor, produtoUrl, fotoUrl, justificativa, categoriaId, contaId, centroCusto, valor, vencimento, formaPagamento, obs}){
+  return {
+    id: uid("compra"),
+    requestedAt,
+    status: "PENDENTE",
+    desc: (desc || "").trim(),
+    fornecedor: (fornecedor || "").trim(),
+    produtoUrl: (produtoUrl || "").trim(),
+    fotoUrl: (fotoUrl || "").trim(),
+    justificativa: (justificativa || "").trim(),
+    categoriaId,
+    contaId,
+    centroCusto: (centroCusto || "").trim(),
+    valor: Number(valor),
+    vencimento,
+    formaPagamento: (formaPagamento || "").trim(),
+    obs: (obs || "").trim(),
+    titleId: null,
+    approvedAt: null,
+    rejectedAt: null
+  };
+}
+
+function compraStatusBadge(status){
+  if(status === "APROVADO") return `<span class="badge ok">APROVADO</span>`;
+  if(status === "REPROVADO") return `<span class="badge bad">REPROVADO</span>`;
+  if(status === "CANCELADO") return `<span class="badge bad">CANCELADO</span>`;
+  return `<span class="badge warn">PENDENTE</span>`;
+}
+
+function buildCompraTituloObs(compra){
+  return buildTitleObs(compra.obs, {
+    formaPagamento: compra.formaPagamento,
+    compraId: compra.id,
+    produtoUrl: compra.produtoUrl,
+    justificativaCompra: compra.justificativa
+  });
+}
+
+function gerarTituloDaCompra(compra){
+  const titulo = novoTitulo({
+    tipo: "AP",
+    pessoa: compra.fornecedor,
+    desc: compra.desc,
+    categoriaId: compra.categoriaId,
+    contaId: compra.contaId,
+    valor: compra.valor,
+    vencimento: compra.vencimento,
+    centroCusto: compra.centroCusto,
+    obs: buildCompraTituloObs(compra)
+  });
+  titulo.status = "ABERTO";
+  state.titulos.unshift(titulo);
+  return titulo;
+}
+
+function syncCompraToTitulo(compra){
+  if(!compra.titleId) return;
+  const titulo = state.titulos.find(t => t.id === compra.titleId);
+  if(!titulo) return;
+
+  titulo.contaId = compra.contaId;
+  titulo.categoriaId = compra.categoriaId;
+  titulo.pessoa = compra.fornecedor;
+  titulo.desc = compra.desc;
+  titulo.valor = compra.valor;
+  titulo.vencimento = compra.vencimento;
+  titulo.centroCusto = compra.centroCusto;
+  titulo.obs = buildCompraTituloObs(compra);
+}
+
+function aprovarCompra(compraId){
+  const compra = state.compras.find(c => c.id === compraId);
+  if(!compra) throw new Error("Solicitacao de compra nao encontrada.");
+
+  if(!compra.titleId){
+    const titulo = gerarTituloDaCompra(compra);
+    compra.titleId = titulo.id;
+  } else {
+    syncCompraToTitulo(compra);
+  }
+
+  compra.status = "APROVADO";
+  compra.approvedAt = nowIsoLocal();
+  compra.rejectedAt = null;
+}
+
+function reprovarCompra(compraId){
+  const compra = state.compras.find(c => c.id === compraId);
+  if(!compra) throw new Error("Solicitacao de compra nao encontrada.");
+  if(compra.titleId) throw new Error("Nao e possivel reprovar uma solicitacao que ja gerou contas a pagar.");
+  compra.status = "REPROVADO";
+  compra.rejectedAt = nowIsoLocal();
+  compra.approvedAt = null;
+}
+
+function cancelarCompra(compraId){
+  const compra = state.compras.find(c => c.id === compraId);
+  if(!compra) throw new Error("Solicitacao de compra nao encontrada.");
+  if(compra.titleId) throw new Error("Nao e possivel cancelar uma solicitacao ja aprovada.");
+  compra.status = "CANCELADO";
+  compra.rejectedAt = null;
+  compra.approvedAt = null;
+}
+
+function nowIsoLocal(){
+  return new Date().toISOString();
+}
+
+function openTituloDaCompra(compraId){
+  const compra = state.compras.find(c => c.id === compraId);
+  if(!compra?.titleId) return;
+  setView("pagar");
+  openTituloModal(compra.titleId, "AP");
+}
+
+function renderCompraPreview(){
+  const fotoBox = $("#compraFotoPreview");
+  const linkBox = $("#compraLinkPreview");
+  const statusBox = $("#compraStatusInfo");
+  if(!fotoBox || !linkBox || !statusBox) return;
+
+  const fotoUrl = ($("#pcFotoUrl").value || "").trim();
+  const produtoUrl = ($("#pcProdutoUrl").value || "").trim();
+  const compra = editCompraId ? state.compras.find(c => c.id === editCompraId) : null;
+
+  fotoBox.innerHTML = fotoUrl
+    ? `<img src="${escapeHtml(fotoUrl)}" alt="produto" onerror="this.replaceWith(document.createTextNode('Nao foi possivel carregar a foto informada.'))" />`
+    : `Informe uma URL de imagem para visualizar a foto do produto.`;
+
+  linkBox.innerHTML = produtoUrl
+    ? `<a href="${escapeHtml(produtoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(produtoUrl)}</a>`
+    : `Informe o link do produto para facilitar a aprovacao.`;
+
+  statusBox.textContent = compra?.titleId
+    ? "Esta solicitacao ja gerou um contas a pagar. Alteracoes salvas aqui atualizam o titulo vinculado."
+    : "A solicitacao nasce como pendente. A aprovacao gera automaticamente um titulo em contas a pagar.";
+}
+
+function openCompraModal(id=null){
+  editCompraId = id;
+  $("#modalCompra").classList.remove("hidden");
+  $("#modalCompraTitle").textContent = id ? "Editar solicitacao de compra" : "Nova solicitacao de compra";
+
+  const compra = id ? state.compras.find(c => c.id === id) : null;
+  $("#pcData").value = compra?.requestedAt ? String(compra.requestedAt).slice(0, 10) : toISODate(new Date());
+  $("#pcFornecedor").value = compra?.fornecedor || "";
+  $("#pcDesc").value = compra?.desc || "";
+  $("#pcProdutoUrl").value = compra?.produtoUrl || "";
+  $("#pcFotoUrl").value = compra?.fotoUrl || "";
+  $("#pcJustificativa").value = compra?.justificativa || "";
+  $("#pcConta").value = compra?.contaId || $("#pcConta").value;
+  $("#pcCategoria").value = compra?.categoriaId || $("#pcCategoria").value;
+  $("#pcCentroCusto").value = compra?.centroCusto || "";
+  $("#pcFormaPagamento").value = compra?.formaPagamento || "";
+  $("#pcVenc").value = compra?.vencimento || toISODate(new Date());
+  $("#pcValor").value = compra ? Number(compra.valor || 0) : "";
+  $("#pcObs").value = compra?.obs || "";
+  renderCompraPreview();
+}
+
+function closeCompraModal(){
+  $("#modalCompra").classList.add("hidden");
+  editCompraId = null;
+}
+
+function currentCompraDraft(){
+  return {
+    requestedAt: ($("#pcData").value || toISODate(new Date())) + "T00:00:00",
+    fornecedor: $("#pcFornecedor").value.trim(),
+    desc: $("#pcDesc").value.trim(),
+    produtoUrl: $("#pcProdutoUrl").value.trim(),
+    fotoUrl: $("#pcFotoUrl").value.trim(),
+    justificativa: $("#pcJustificativa").value.trim(),
+    contaId: $("#pcConta").value,
+    categoriaId: $("#pcCategoria").value,
+    centroCusto: $("#pcCentroCusto").value.trim(),
+    formaPagamento: $("#pcFormaPagamento").value.trim(),
+    vencimento: $("#pcVenc").value,
+    valor: Number($("#pcValor").value),
+    obs: $("#pcObs").value.trim()
+  };
+}
+
+function renderCompras(){
+  const tb = $("#tbCompras");
+  if(!tb) return;
+
+  const filtroStatus = $("#cpStatus").value || "ALL";
+  const busca = ($("#cpBusca").value || "").trim().toLowerCase();
+  const contaById = new Map(state.contas.map(c => [c.id, c]));
+
+  let list = [...state.compras];
+  if(filtroStatus !== "ALL") list = list.filter(c => c.status === filtroStatus);
+  if(busca){
+    list = list.filter(c => `${c.desc} ${c.fornecedor} ${c.justificativa}`.toLowerCase().includes(busca));
+  }
+
+  list.sort((a, b)=> String(b.requestedAt || "").localeCompare(String(a.requestedAt || "")));
+
+  tb.innerHTML = list.map(compra=>{
+    const conta = contaById.get(compra.contaId);
+    const temTitulo = !!compra.titleId;
+    const podeAprovar = !temTitulo && (compra.status === "PENDENTE" || compra.status === "REPROVADO");
+    const podeReprovar = !temTitulo && compra.status === "PENDENTE";
+    const podeCancelar = !temTitulo && compra.status !== "CANCELADO";
+    return `
+      <tr>
+        <td>${escapeHtml(String(compra.requestedAt || "").slice(0, 10))}</td>
+        <td>${escapeHtml(compra.desc || "")}</td>
+        <td>${escapeHtml(compra.fornecedor || "-")}</td>
+        <td>${escapeHtml(conta?.nome || "-")}</td>
+        <td>${escapeHtml(compra.formaPagamento || "-")}</td>
+        <td>${escapeHtml(compra.vencimento || "-")}</td>
+        <td class="right"><b>${brl(compra.valor)}</b></td>
+        <td>${compraStatusBadge(compra.status)}</td>
+        <td>${temTitulo ? `<button class="btn" data-act="openTitle" data-id="${compra.id}">Abrir AP</button>` : `<span class="muted">Pendente</span>`}</td>
+        <td class="right">
+          <button class="btn" data-act="edit" data-id="${compra.id}">Editar</button>
+          <button class="btn primary" data-act="approve" data-id="${compra.id}" ${podeAprovar ? "" : "disabled"}>Aprovar</button>
+          <button class="btn" data-act="reject" data-id="${compra.id}" ${podeReprovar ? "" : "disabled"}>Reprovar</button>
+          <button class="btn danger" data-act="cancel" data-id="${compra.id}" ${podeCancelar ? "" : "disabled"}>Cancelar</button>
+        </td>
+      </tr>
+    `;
+  }).join("") || `<tr><td colspan="10" class="muted">Nenhuma solicitacao de compra.</td></tr>`;
+}
+
+$("#btnFiltrarCompras")?.addEventListener("click", renderCompras);
+$("#btnNovaCompra")?.addEventListener("click", ()=> openCompraModal());
+$("#btnFecharModalCompra")?.addEventListener("click", closeCompraModal);
+$("#btnCancelarCompra")?.addEventListener("click", closeCompraModal);
+$("#modalCompra")?.addEventListener("click", (e)=>{ if(e.target.id === "modalCompra") closeCompraModal(); });
+$("#pcFotoUrl")?.addEventListener("input", renderCompraPreview);
+$("#pcProdutoUrl")?.addEventListener("input", renderCompraPreview);
+
+$("#btnSalvarCompra")?.addEventListener("click", ()=>{
+  const draft = currentCompraDraft();
+  if(!draft.desc || !draft.justificativa || !draft.contaId || !draft.categoriaId || !draft.formaPagamento || !draft.vencimento || !Number.isFinite(draft.valor) || draft.valor <= 0){
+    alert("Preencha produto, justificativa, conta, categoria, forma de pagamento, vencimento e valor.");
+    return;
+  }
+
+  if(editCompraId){
+    const compra = state.compras.find(c => c.id === editCompraId);
+    if(!compra) return;
+    Object.assign(compra, draft);
+    if(compra.titleId) syncCompraToTitulo(compra);
+  } else {
+    state.compras.unshift(novoPedidoCompra(draft));
+  }
+
+  saveState();
+  renderAll();
+  closeCompraModal();
+});
+
+$("#tbCompras")?.addEventListener("click", (e)=>{
+  const btn = e.target.closest("button");
+  if(!btn) return;
+  const compraId = btn.dataset.id;
+  const act = btn.dataset.act;
+  const compra = state.compras.find(c => c.id === compraId);
+  if(!compra) return;
+
+  try{
+    if(act === "edit") openCompraModal(compraId);
+    if(act === "openTitle") openTituloDaCompra(compraId);
+    if(act === "approve"){
+      aprovarCompra(compraId);
+      saveState();
+      renderAll();
+      alert("Solicitacao aprovada e contas a pagar gerado.");
+    }
+    if(act === "reject"){
+      reprovarCompra(compraId);
+      saveState();
+      renderAll();
+      alert("Solicitacao reprovada.");
+    }
+    if(act === "cancel"){
+      cancelarCompra(compraId);
+      saveState();
+      renderAll();
+      alert("Solicitacao cancelada.");
+    }
+  }catch(err){
+    alert(err?.message || "Nao foi possivel atualizar a solicitacao.");
+  }
+});
+
 /* ---------- Views AP/AR ---------- */
 function renderAPAR(){
   renderTabelaTitulos("AP");
@@ -1373,6 +1723,7 @@ function renderTabelaTitulos(tipo){
 
   tb.innerHTML = list.map(t=>{
     const conta = contaById.get(t.contaId);
+    const pagamento = getTituloFormaPagamento(t);
     const st = t.status==="ABERTO" ? `<span class="badge warn">ABERTO</span>`
             : t.status==="BAIXADO" ? `<span class="badge ok">BAIXADO</span>`
             : `<span class="badge bad">CANCELADO</span>`;
@@ -1388,6 +1739,7 @@ function renderTabelaTitulos(tipo){
         <td>${escapeHtml(t.centroCusto || "-")}</td>
         <td>${escapeHtml(t.pessoa || "-")}</td>
         <td>${escapeHtml(t.desc || "")}</td>
+        <td>${escapeHtml(pagamento || "-")}</td>
         <td class="right"><b>${brl(t.valor)}</b></td>
         <td>${st}</td>
         <td>${anexBadge}</td>
@@ -1398,7 +1750,7 @@ function renderTabelaTitulos(tipo){
         </td>
       </tr>
     `;
-  }).join("") || `<tr><td colspan="9" class="muted">Nenhum título.</td></tr>`;
+  }).join("") || `<tr><td colspan="10" class="muted">Nenhum título.</td></tr>`;
 }
 
 $("#btnFiltrarAP").addEventListener("click", ()=>renderTabelaTitulos("AP"));
@@ -1477,6 +1829,7 @@ function criarTitulosParcelados(draft){
   const primeiraParcela = draft.primeiraParcela || draft.vencimento;
   const valores = splitAmount(draft.valor, parcelas);
   const createdIds = [];
+  const baseMeta = { formaPagamento: draft.formaPagamento };
 
   for(let index = 0; index < parcelas; index++){
     const titulo = novoTitulo({
@@ -1484,7 +1837,10 @@ function criarTitulosParcelados(draft){
       valor: valores[index],
       vencimento: addMonthsISO(primeiraParcela, index),
       desc: `${draft.desc} (${index + 1}/${parcelas})`,
-      obs: [draft.obs, `Parcela ${index + 1}/${parcelas}`].filter(Boolean).join(" | ")
+      obs: buildTitleObs(
+        [draft.obs, `Parcela ${index + 1}/${parcelas}`].filter(Boolean).join(" | "),
+        baseMeta
+      )
     });
     titulo.status = draft.status || "ABERTO";
     state.titulos.unshift(titulo);
@@ -1500,9 +1856,12 @@ function openTituloModal(id, tipoDefault="AP"){
   $("#modalTitulo").classList.remove("hidden");
 
   const t = id ? state.titulos.find(x=>x.id===id) : null;
+  const parsedObs = parseTitleObs(t?.obs);
+  const compraVinculada = id ? getCompraByTituloId(id) : null;
   $("#modalTituloTitle").textContent = id ? "Editar título" : "Novo título";
 
   $("#tTipo").value = t?.tipo || tipoDefault;
+  $("#tTipo").disabled = !!compraVinculada;
   fillSelects();
   $("#tStatus").value = t?.status || "ABERTO";
   $("#tVenc").value = t?.vencimento || toISODate(new Date());
@@ -1512,7 +1871,8 @@ function openTituloModal(id, tipoDefault="AP"){
   $("#tDesc").value = t?.desc || "";
   $("#tCategoria").value = t?.categoriaId || $("#tCategoria").value;
   $("#tValor").value = t ? Number(t.valor||0) : "";
-  $("#tObs").value = t?.obs || "";
+  $("#tFormaPagamento").value = parsedObs.meta.formaPagamento || "";
+  $("#tObs").value = parsedObs.text || "";
   $("#tGerarParcelas").checked = false;
   $("#tParcelas").value = 2;
   $("#tPrimeiraParcela").value = t?.vencimento || $("#tVenc").value;
@@ -1528,6 +1888,7 @@ function closeTituloModal(){
   $("#modalTitulo").classList.add("hidden");
   editTituloId = null;
   previewAnexoId = null;
+  $("#tTipo").disabled = false;
   renderAnexoPreview(null);
 }
 
@@ -1542,11 +1903,30 @@ function currentTituloDraft(){
     desc: $("#tDesc").value.trim(),
     categoriaId: $("#tCategoria").value,
     valor: Number($("#tValor").value),
+    formaPagamento: $("#tFormaPagamento").value.trim(),
     obs: $("#tObs").value.trim(),
     gerarParcelas: $("#tGerarParcelas").checked,
     parcelas: clamp(Number($("#tParcelas").value || 1), 1, 60),
     primeiraParcela: $("#tPrimeiraParcela").value || $("#tVenc").value
   };
+}
+
+function syncCompraFromTitulo(titulo, draft, meta){
+  const compraId = meta?.compraId || "";
+  if(!compraId) return;
+
+  const compra = state.compras.find(item => item.id === compraId);
+  if(!compra) return;
+
+  compra.fornecedor = draft.pessoa;
+  compra.desc = draft.desc;
+  compra.categoriaId = draft.categoriaId;
+  compra.contaId = draft.contaId;
+  compra.valor = draft.valor;
+  compra.vencimento = draft.vencimento;
+  compra.centroCusto = draft.centroCusto;
+  compra.formaPagamento = draft.formaPagamento;
+  compra.obs = draft.obs;
 }
 
 function updateBaixaButton(){
@@ -1624,6 +2004,7 @@ $("#btnSalvarTitulo").addEventListener("click", ()=>{
   if(editTituloId){
     const t = state.titulos.find(x=>x.id===editTituloId);
     if(!t) return;
+    const oldMeta = parseTitleObs(t.obs).meta;
     t.tipo = d.tipo;
     t.status = d.status;
     t.vencimento = d.vencimento;
@@ -1633,7 +2014,8 @@ $("#btnSalvarTitulo").addEventListener("click", ()=>{
     t.pessoa = d.pessoa;
     t.valor = d.valor;
     t.centroCusto = d.centroCusto;
-    t.obs = d.obs;
+    t.obs = buildTitleObs(d.obs, { ...oldMeta, formaPagamento: d.formaPagamento });
+    syncCompraFromTitulo(t, d, oldMeta);
   } else {
     if(d.gerarParcelas && d.parcelas > 1){
       const createdIds = criarTitulosParcelados(d);
@@ -1645,7 +2027,7 @@ $("#btnSalvarTitulo").addEventListener("click", ()=>{
       return;
     }
 
-    const t = novoTitulo(d);
+    const t = novoTitulo({ ...d, obs: buildTitleObs(d.obs, { formaPagamento: d.formaPagamento }) });
     t.status = d.status || "ABERTO";
     state.titulos.unshift(t);
     editTituloId = t.id;
