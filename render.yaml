@@ -11,3 +11,9 @@ services:
         sync: false
       - key: DB_SSL
         value: "false"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FINANCE_AI_MODEL
+        value: "gpt-5.4"
+      - key: FINANCE_AI_SEARCH_CONTEXT
+        value: "medium"

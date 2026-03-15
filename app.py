@@ -2052,6 +2052,7 @@ def ensure_within_root(candidate: Path) -> Path:
 
 @app.get("/api/health")
 def healthcheck():
+    ai_settings = finance_ai_settings()
     with SessionLocal() as session:
         session.execute(text("SELECT 1"))
         storage = {
@@ -2078,7 +2079,17 @@ def healthcheck():
             ],
         }
 
-    return jsonify({"ok": True, "storage": storage, "timestamp": now_iso()})
+    return jsonify(
+        {
+            "ok": True,
+            "storage": storage,
+            "integrations": {
+                "openaiConfigured": ai_settings["enabled"],
+                "financeAiModel": ai_settings["model"],
+            },
+            "timestamp": now_iso(),
+        }
+    )
 
 
 @app.get("/api/site/apps")
