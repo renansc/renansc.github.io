@@ -1584,8 +1584,8 @@ function renderCompraAiResults(){
   }
 
   if(compraAiState.loading){
-    statusBox.textContent = "Pesquisando ofertas atuais e organizando por faixa de preco e aderencia.";
-    resultsBox.innerHTML = `<div class="muted">Aguarde um instante, a IA esta consultando a web.</div>`;
+    statusBox.textContent = "Varrendo lojas online e organizando ofertas por faixa de preco e aderencia.";
+    resultsBox.innerHTML = `<div class="muted">Aguarde um instante, o motor Python esta pesquisando na web.</div>`;
     return;
   }
 
@@ -2324,15 +2324,11 @@ function financeAiBadgeClass(level){
 }
 
 function financeAiBadgeLabel(code, level){
-  if(code === "connected") return "Conectado";
-  if(code === "missing_key") return "Sem chave";
-  if(code === "insufficient_quota") return "Sem saldo";
-  if(code === "auth_error") return "Autenticacao";
-  if(code === "model_not_found") return "Modelo";
-  if(code === "forbidden") return "Permissao";
-  if(code === "rate_limited") return "Limite";
+  if(code === "scraper_ready") return "Pronto";
+  if(code === "search_ok") return "Busca OK";
+  if(code === "search_empty") return "Sem links";
+  if(code === "search_unreachable") return "Busca";
   if(code === "network_error") return "Rede";
-  if(code === "api_error") return "Erro API";
   if(level === "ok") return "Pronto";
   if(level === "bad") return "Falha";
   return "Atencao";
@@ -2354,12 +2350,12 @@ function renderFinanceAiStatus(){
   if(financeAiDiagState.loading){
     badge.className = "badge warn";
     badge.textContent = "Verificando...";
-    checkedAt.textContent = "Consultando o servidor e a OpenAI.";
+    checkedAt.textContent = "Consultando o servidor e a busca web.";
     messageBox.className = "statusBox";
-    messageBox.textContent = "Executando diagnostico da I.A. Aguarde um instante.";
+    messageBox.textContent = "Executando diagnostico da pesquisa inteligente. Aguarde um instante.";
     detailsBox.innerHTML = `
       <div class="diagItem"><div class="diagLabel">Servidor</div><div class="diagValue">Lendo configuracao...</div></div>
-      <div class="diagItem"><div class="diagLabel">OpenAI</div><div class="diagValue">Validando modelo...</div></div>
+      <div class="diagItem"><div class="diagLabel">Busca web</div><div class="diagValue">Testando raspagem...</div></div>
     `;
     return;
   }
@@ -2385,7 +2381,7 @@ function renderFinanceAiStatus(){
     badge.textContent = "Pendente";
     checkedAt.textContent = "Nenhum diagnostico executado ainda.";
     messageBox.className = "statusBox";
-    messageBox.textContent = "Abra esta aba ou clique em atualizar para verificar a configuracao da OpenAI.";
+    messageBox.textContent = "Abra esta aba ou clique em atualizar para verificar o mecanismo Python de scraping.";
     detailsBox.innerHTML = "";
     return;
   }
@@ -2403,49 +2399,53 @@ function renderFinanceAiStatus(){
 
   detailsBox.innerHTML = [
     {
-      label: "Variavel esperada",
-      value: "OPENAI_API_KEY"
+      label: "Provedor",
+      value: config.provider || "-"
     },
     {
-      label: "Chave no servidor",
-      value: config.apiKeyPresent
-        ? `Detectada${config.apiKeyHint ? ` (${config.apiKeyHint})` : ""}`
-        : "Nao detectada"
+      label: "Mecanismo",
+      value: config.engine || "-"
     },
     {
-      label: "Formato da chave",
-      value: !config.apiKeyPresent ? "-" : (config.apiKeyLooksValid ? "Parece valido" : "Formato inesperado")
+      label: "Busca web",
+      value: config.searchUrl || "-"
     },
     {
-      label: "Modelo configurado",
-      value: config.model || "-"
+      label: "Lojas monitoradas",
+      value: config.allowedDomainsCount || "-"
     },
     {
-      label: "Base URL",
-      value: config.baseUrl || "-"
+      label: "Dominios permitidos",
+      value: Array.isArray(config.allowedDomains) && config.allowedDomains.length
+        ? config.allowedDomains.join(", ")
+        : "-"
     },
     {
-      label: "Projeto OpenAI",
-      value: config.projectPresent ? "Informado" : "Nao informado"
+      label: "Timeout",
+      value: config.timeoutSeconds ? `${config.timeoutSeconds}s` : "-"
     },
     {
-      label: "Organizacao",
-      value: config.organizationPresent ? "Informada" : "Nao informada"
+      label: "Max. ofertas",
+      value: config.maxOffers || "-"
     },
     {
-      label: "Teste remoto",
+      label: "User-Agent",
+      value: config.userAgentConfigured ? "Configurado" : "Padrao"
+    },
+    {
+      label: "Teste da busca",
       value: probe.attempted ? (probe.success ? "Conexao validada" : "Falhou") : "Nao executado"
     },
     {
-      label: "HTTP OpenAI",
-      value: probe.httpStatus || "-"
+      label: "Resultados de teste",
+      value: probe.resultCount || "-"
     },
     {
-      label: "Codigo OpenAI",
+      label: "Codigo",
       value: probe.errorCode || status.code || "-"
     },
     {
-      label: "Detalhe da OpenAI",
+      label: "Detalhe",
       value: probe.message || "Sem detalhe adicional."
     }
   ].map(item => `

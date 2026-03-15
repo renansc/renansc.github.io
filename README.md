@@ -93,24 +93,23 @@ O financeiro agora inclui a aba de solicitacoes de compra:
 
 ### Pesquisa I.A de compras
 
-O modal de compras agora inclui o botao `Pesquisa I.A`, que consulta a web e devolve links organizados por:
+O modal de compras agora inclui o botao `Pesquisa I.A`, que usa um motor Python de scraping para consultar a web e devolver links organizados por:
 
 - melhor preco
 - custo-beneficio
 - alternativas
 
-Para habilitar no servidor, configure:
+Configuracoes opcionais do scraper no servidor:
 
-- `OPENAI_API_KEY`
-- `FINANCE_AI_MODEL` (opcional, padrao `gpt-5`)
-- `FINANCE_AI_SEARCH_CONTEXT` (opcional: `low`, `medium` ou `high`)
-- `FINANCE_AI_TIMEOUT_SECONDS` (opcional)
-- `FINANCE_AI_MAX_OFFERS` (opcional)
+- `FINANCE_SCRAPER_DOMAINS` com uma lista separada por virgula dos dominios permitidos
+- `FINANCE_SCRAPER_TIMEOUT_SECONDS`
+- `FINANCE_RESEARCH_MAX_OFFERS`
+- `FINANCE_SCRAPER_USER_AGENT`
 
 Observacoes:
 
 - a pesquisa prioriza lojas brasileiras e valores em BRL
-- o frontend nao expoe a chave da OpenAI; a chamada acontece no Flask
+- o scraping e executado no Flask/Python
 - os links retornados podem ser usados para preencher fornecedor, URL do produto e valor estimado na solicitacao
 
 ## Avisos por e-mail

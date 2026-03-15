@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
+from finance_research import DEFAULT_ALLOWED_DOMAINS, DEFAULT_USER_AGENT, ScraperError, build_scraper_diagnostic, run_scraper_purchase_research
 from flask import Flask, abort, jsonify, request, send_from_directory
 from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, delete, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -420,6 +421,19 @@ def finance_ai_settings() -> dict[str, Any]:
     }
 
 
+def finance_scraper_settings() -> dict[str, Any]:
+    raw_domains = [item.strip().lower() for item in as_text(os.getenv("FINANCE_SCRAPER_DOMAINS")).split(",") if item.strip()]
+    return {
+        "allowed_domains": tuple(raw_domains) if raw_domains else DEFAULT_ALLOWED_DOMAINS,
+        "timeout_seconds": max(as_int(os.getenv("FINANCE_SCRAPER_TIMEOUT_SECONDS"), 12), 5),
+        "max_offers": min(
+            max(as_int(os.getenv("FINANCE_RESEARCH_MAX_OFFERS") or os.getenv("FINANCE_AI_MAX_OFFERS"), 6), 3),
+            12,
+        ),
+        "user_agent": as_text(os.getenv("FINANCE_SCRAPER_USER_AGENT"), DEFAULT_USER_AGENT),
+    }
+
+
 def openai_request_headers(settings: dict[str, Any], *, include_json: bool = True) -> dict[str, str]:
     headers = {"Authorization": f"Bearer {settings['api_key']}"}
     if include_json:
@@ -795,107 +809,27 @@ def run_finance_purchase_research(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise AppError(400, "Envie um JSON valido com os dados da compra.")
 
-    prompt_payload = {
+    scraper_payload = {
         "desc": as_text(payload.get("desc"))[:240],
         "fornecedor": as_text(payload.get("fornecedor"))[:180],
         "justificativa": as_text(payload.get("justificativa"))[:500],
         "obs": as_text(payload.get("obs"))[:500],
         "produto_url": as_text(payload.get("produtoUrl"))[:500],
     }
-    if len(prompt_payload["desc"]) < 3:
+    if len(scraper_payload["desc"]) < 3:
         raise AppError(400, "Informe a descricao do produto para pesquisar com a IA.")
 
-    settings = finance_ai_settings()
-    response_payload = request_openai_json(
-        "responses",
-        {
-            "model": settings["model"],
-            "reasoning": {"effort": "low"},
-            "instructions": (
-                "Voce e um assistente de compras corporativas para um sistema financeiro brasileiro. "
-                "Use obrigatoriamente a ferramenta web_search antes de responder. "
-                "Retorne somente JSON valido seguindo o schema. "
-                "Priorize lojas brasileiras, valores em BRL e links diretos para paginas de produto, servico ou plano. "
-                "Nao inclua paginas de busca, comparadores genericos, blogs ou links inventados. "
-                "Classifique cada oferta em melhor_preco, custo_beneficio ou alternativa. "
-                "Ordene as ofertas do menor preco confiavel para o maior sempre que os valores forem comparaveis. "
-                "Use textos curtos e objetivos em summary e reason."
-            ),
-            "input": build_finance_purchase_research_input(prompt_payload, settings["max_offers"]),
-            "tools": [
-                {
-                    "type": "web_search",
-                    "user_location": {"type": "approximate", "country": "BR"},
-                    "search_context_size": settings["search_context_size"],
-                }
-            ],
-            "tool_choice": "required",
-            "include": ["web_search_call.action.sources"],
-            "max_output_tokens": 1800,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "finance_purchase_research",
-                    "schema": finance_purchase_research_schema(),
-                    "strict": True,
-                }
-            },
-        },
-        settings,
-    )
-
-    output_text = extract_openai_response_text(response_payload)
-    if not output_text:
-        raise AppError(502, "A Pesquisa I.A nao retornou resultados utilizaveis.")
-
+    settings = finance_scraper_settings()
     try:
-        parsed = json.loads(output_text)
-    except json.JSONDecodeError as exc:
-        raise AppError(502, "A IA retornou um formato inesperado para a pesquisa.") from exc
-
-    raw_offers = parsed.get("offers")
-    if not isinstance(raw_offers, list):
-        raise AppError(502, "A IA nao retornou uma lista de ofertas valida.")
-
-    offers: list[dict[str, Any]] = []
-    seen_urls: set[str] = set()
-    for item in raw_offers:
-        if not isinstance(item, dict):
-            continue
-        url = as_text(item.get("url"))
-        if not re.match(r"^https?://", url) or url in seen_urls:
-            continue
-        seen_urls.add(url)
-
-        category = as_text(item.get("category"), "alternativa")
-        if category not in {"melhor_preco", "custo_beneficio", "alternativa"}:
-            category = "alternativa"
-
-        price_value = max(as_float(item.get("price_value"), 0.0), 0.0)
-        offers.append(
-            {
-                "category": category,
-                "title": as_text(item.get("title")),
-                "store": as_text(item.get("store")),
-                "url": url,
-                "priceText": as_text(item.get("price_text")),
-                "priceValue": round(price_value, 2),
-                "currency": as_text(item.get("currency"), "BRL") or "BRL",
-                "reason": as_text(item.get("reason")),
-            }
+        return run_scraper_purchase_research(
+            scraper_payload,
+            allowed_domains=settings["allowed_domains"],
+            max_offers=settings["max_offers"],
+            timeout_seconds=settings["timeout_seconds"],
+            user_agent=settings["user_agent"],
         )
-        if len(offers) >= settings["max_offers"]:
-            break
-
-    return {
-        "ok": True,
-        "query": as_text(parsed.get("query")),
-        "summary": as_text(parsed.get("summary")),
-        "offers": offers,
-        "sources": extract_openai_response_sources(response_payload),
-        "generatedAt": now_iso(),
-        "model": settings["model"],
-    }
+    except ScraperError as exc:
+        raise AppError(502, str(exc)) from exc
 
 
 def image_bytes_from_data_url(data_url: str) -> bytes:
@@ -2272,7 +2206,7 @@ def ensure_within_root(candidate: Path) -> Path:
 
 @app.get("/api/health")
 def healthcheck():
-    ai_settings = finance_ai_settings()
+    scraper_settings = finance_scraper_settings()
     with SessionLocal() as session:
         session.execute(text("SELECT 1"))
         storage = {
@@ -2304,8 +2238,9 @@ def healthcheck():
             "ok": True,
             "storage": storage,
             "integrations": {
-                "openaiConfigured": ai_settings["enabled"],
-                "financeAiModel": ai_settings["model"],
+                "researchProvider": "python_scraper",
+                "researchDomains": len(scraper_settings["allowed_domains"]),
+                "researchMaxOffers": scraper_settings["max_offers"],
             },
             "timestamp": now_iso(),
         }
@@ -2410,7 +2345,16 @@ def trigger_finance_reminders():
 @app.get("/api/finance/ai-status")
 def finance_ai_status():
     probe = parse_bool(request.args.get("probe"), False)
-    return jsonify(build_finance_ai_diagnostic(probe=probe))
+    settings = finance_scraper_settings()
+    return jsonify(
+        build_scraper_diagnostic(
+            allowed_domains=settings["allowed_domains"],
+            timeout_seconds=settings["timeout_seconds"],
+            max_offers=settings["max_offers"],
+            probe=probe,
+            user_agent=settings["user_agent"],
+        )
+    )
 
 
 @app.post("/api/finance/purchase-research")
