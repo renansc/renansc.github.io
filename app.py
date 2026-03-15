@@ -431,16 +431,70 @@ def openai_request_headers(settings: dict[str, Any], *, include_json: bool = Tru
     return headers
 
 
-def parse_openai_error_message(raw_body: str, fallback: str = "Falha ao consultar a IA.") -> str:
+def parse_openai_error(raw_body: str, fallback: str = "Falha ao consultar a IA.") -> dict[str, str]:
+    result = {"message": fallback, "type": "", "code": "", "param": ""}
     try:
         error_payload = json.loads(raw_body)
     except json.JSONDecodeError:
-        return fallback
+        return result
 
     error_info = error_payload.get("error")
     if isinstance(error_info, dict):
-        return as_text(error_info.get("message")) or fallback
-    return as_text(error_payload.get("message")) or fallback
+        result["message"] = as_text(error_info.get("message")) or fallback
+        result["type"] = as_text(error_info.get("type"))
+        result["code"] = as_text(error_info.get("code"))
+        result["param"] = as_text(error_info.get("param"))
+        return result
+
+    result["message"] = as_text(error_payload.get("message")) or fallback
+    return result
+
+
+def parse_openai_error_message(raw_body: str, fallback: str = "Falha ao consultar a IA.") -> str:
+    return parse_openai_error(raw_body, fallback)["message"]
+
+
+def friendly_openai_error_message(
+    status_code: int,
+    error_info: dict[str, str],
+    fallback: str = "Falha ao consultar a IA.",
+) -> tuple[str, str]:
+    message = as_text(error_info.get("message")) or fallback
+    error_code = as_text(error_info.get("code")).lower()
+    error_type = as_text(error_info.get("type")).lower()
+    normalized = f"{error_code} {error_type} {message}".lower()
+
+    if "insufficient_quota" in normalized or "exceeded your current quota" in normalized:
+        return (
+            "insufficient_quota",
+            "A OpenAI informou que o projeto esta sem saldo ou atingiu o limite de uso da API. Verifique Billing e Limits no painel da OpenAI.",
+        )
+
+    if status_code == 429:
+        return (
+            "rate_limited",
+            "A OpenAI respondeu com limite temporario de requisicoes. Aguarde um pouco e tente novamente.",
+        )
+
+    if status_code == 401:
+        return (
+            "auth_error",
+            "A OpenAI recusou a autenticacao da chave configurada no servidor.",
+        )
+
+    if status_code == 403:
+        return (
+            "forbidden",
+            "A chave existe, mas este projeto nao tem permissao para acessar a API ou o modelo configurado.",
+        )
+
+    if status_code == 404:
+        return (
+            "model_not_found",
+            "O modelo configurado nao foi encontrado ou nao esta liberado para esta chave.",
+        )
+
+    return ("api_error", message)
 
 
 def send_openai_request(
@@ -517,6 +571,7 @@ def build_finance_ai_diagnostic(*, probe: bool = False) -> dict[str, Any]:
             "httpStatus": None,
             "message": "",
             "modelId": "",
+            "errorCode": "",
         },
     }
 
@@ -574,8 +629,10 @@ def build_finance_ai_diagnostic(*, probe: bool = False) -> dict[str, Any]:
         return result
 
     status_code = response["status_code"]
-    message = parse_openai_error_message(response["body"], "Falha ao validar a configuracao da OpenAI.")
-    result["probe"]["message"] = message
+    parsed_error = parse_openai_error(response["body"], "Falha ao validar a configuracao da OpenAI.")
+    friendly_code, friendly_message = friendly_openai_error_message(status_code, parsed_error, parsed_error["message"])
+    result["probe"]["message"] = friendly_message
+    result["probe"]["errorCode"] = friendly_code
 
     if status_code == 401:
         result["status"] = {
@@ -598,14 +655,14 @@ def build_finance_ai_diagnostic(*, probe: bool = False) -> dict[str, Any]:
     elif status_code == 429:
         result["status"] = {
             "level": "warn",
-            "code": "rate_limited",
-            "message": "A OpenAI respondeu com limite de uso ou falta de creditos.",
+            "code": friendly_code,
+            "message": friendly_message,
         }
     else:
         result["status"] = {
             "level": "bad",
-            "code": "api_error",
-            "message": "A OpenAI respondeu com erro ao validar a configuracao.",
+            "code": friendly_code,
+            "message": friendly_message,
         }
 
     return result
@@ -724,7 +781,9 @@ def request_openai_json(path: str, payload: dict[str, Any], settings: dict[str, 
     response = send_openai_request(path, settings, method="POST", payload=payload)
     raw_body = response["body"]
     if not response["ok"]:
-        raise AppError(502, parse_openai_error_message(raw_body)) from None
+        parsed_error = parse_openai_error(raw_body)
+        _, friendly_message = friendly_openai_error_message(response["status_code"], parsed_error, parsed_error["message"])
+        raise AppError(502, friendly_message) from None
 
     try:
         return json.loads(raw_body)

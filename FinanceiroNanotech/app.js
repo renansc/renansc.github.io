@@ -2326,6 +2326,7 @@ function financeAiBadgeClass(level){
 function financeAiBadgeLabel(code, level){
   if(code === "connected") return "Conectado";
   if(code === "missing_key") return "Sem chave";
+  if(code === "insufficient_quota") return "Sem saldo";
   if(code === "auth_error") return "Autenticacao";
   if(code === "model_not_found") return "Modelo";
   if(code === "forbidden") return "Permissao";
@@ -2438,6 +2439,10 @@ function renderFinanceAiStatus(){
     {
       label: "HTTP OpenAI",
       value: probe.httpStatus || "-"
+    },
+    {
+      label: "Codigo OpenAI",
+      value: probe.errorCode || status.code || "-"
     },
     {
       label: "Detalhe da OpenAI",
