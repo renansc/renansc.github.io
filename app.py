@@ -8,6 +8,8 @@ import os
 import re
 import smtplib
 import unicodedata
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 from io import BytesIO
@@ -397,6 +399,282 @@ def finance_mail_settings() -> dict[str, Any]:
         "to": recipients,
         "use_tls": parse_bool(os.getenv("SMTP_USE_TLS"), True),
         "use_ssl": parse_bool(os.getenv("SMTP_USE_SSL"), False),
+    }
+
+
+def finance_ai_settings() -> dict[str, Any]:
+    search_context_size = as_text(os.getenv("FINANCE_AI_SEARCH_CONTEXT"), "medium").lower()
+    if search_context_size not in {"low", "medium", "high"}:
+        search_context_size = "medium"
+
+    return {
+        "enabled": bool(as_text(os.getenv("OPENAI_API_KEY"))),
+        "api_key": as_text(os.getenv("OPENAI_API_KEY")),
+        "model": as_text(os.getenv("FINANCE_AI_MODEL") or os.getenv("OPENAI_MODEL"), "gpt-5"),
+        "base_url": as_text(os.getenv("OPENAI_API_BASE"), "https://api.openai.com/v1").rstrip("/"),
+        "organization": as_text(os.getenv("OPENAI_ORGANIZATION")),
+        "project": as_text(os.getenv("OPENAI_PROJECT")),
+        "search_context_size": search_context_size,
+        "timeout_seconds": max(as_int(os.getenv("FINANCE_AI_TIMEOUT_SECONDS"), 45), 10),
+        "max_offers": min(max(as_int(os.getenv("FINANCE_AI_MAX_OFFERS"), 6), 3), 12),
+    }
+
+
+def finance_purchase_research_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "query": {"type": "string"},
+            "summary": {"type": "string"},
+            "offers": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["melhor_preco", "custo_beneficio", "alternativa"],
+                        },
+                        "title": {"type": "string"},
+                        "store": {"type": "string"},
+                        "url": {"type": "string"},
+                        "price_text": {"type": "string"},
+                        "price_value": {"type": "number"},
+                        "currency": {"type": "string"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": [
+                        "category",
+                        "title",
+                        "store",
+                        "url",
+                        "price_text",
+                        "price_value",
+                        "currency",
+                        "reason",
+                    ],
+                },
+            },
+        },
+        "required": ["query", "summary", "offers"],
+    }
+
+
+def build_finance_purchase_research_input(payload: dict[str, str], max_offers: int) -> str:
+    parts = [
+        "Contexto da solicitacao de compra:",
+        f"- Produto/servico: {payload['desc']}",
+        f"- Fornecedor preferido: {payload['fornecedor'] or 'nao informado'}",
+        f"- Justificativa: {payload['justificativa'] or 'nao informada'}",
+        f"- Detalhes internos: {payload['obs'] or 'nao informados'}",
+        f"- Link de referencia atual: {payload['produto_url'] or 'nao informado'}",
+        "",
+        "Objetivo:",
+        "- encontrar ofertas atuais e aderentes ao pedido",
+        "- priorizar lojas brasileiras, preco em BRL e paginas diretas de produto/plano",
+        "- listar ate "
+        f"{max_offers}"
+        " links reais e acionaveis",
+        "- organizar por melhor preco, custo-beneficio e alternativas",
+    ]
+    return "\n".join(parts)
+
+
+def extract_openai_response_text(response_payload: dict[str, Any]) -> str:
+    chunks: list[str] = []
+    for item in response_payload.get("output", []):
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        for content in item.get("content", []):
+            if not isinstance(content, dict):
+                continue
+            if content.get("type") == "output_text" and as_text(content.get("text")):
+                chunks.append(as_text(content.get("text")))
+    return "\n".join(chunk for chunk in chunks if chunk).strip()
+
+
+def extract_openai_response_sources(response_payload: dict[str, Any]) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add_source(title: Any, url: Any) -> None:
+        clean_url = as_text(url)
+        if not re.match(r"^https?://", clean_url) or clean_url in seen:
+            return
+        seen.add(clean_url)
+        sources.append({"title": as_text(title) or clean_url, "url": clean_url})
+
+    for item in response_payload.get("output", []):
+        if not isinstance(item, dict):
+            continue
+
+        if item.get("type") == "web_search_call":
+            action = item.get("action")
+            if isinstance(action, dict):
+                for source in action.get("sources", []):
+                    if isinstance(source, dict):
+                        add_source(source.get("title"), source.get("url"))
+
+        if item.get("type") != "message":
+            continue
+        for content in item.get("content", []):
+            if not isinstance(content, dict):
+                continue
+            for annotation in content.get("annotations", []):
+                if isinstance(annotation, dict) and annotation.get("type") == "url_citation":
+                    add_source(annotation.get("title"), annotation.get("url"))
+
+    return sources
+
+
+def request_openai_json(path: str, payload: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any]:
+    if not settings["enabled"] or not settings["api_key"]:
+        raise AppError(503, "Configure OPENAI_API_KEY no servidor para usar a Pesquisa I.A.")
+
+    headers = {
+        "Authorization": f"Bearer {settings['api_key']}",
+        "Content-Type": "application/json",
+    }
+    if settings["organization"]:
+        headers["OpenAI-Organization"] = settings["organization"]
+    if settings["project"]:
+        headers["OpenAI-Project"] = settings["project"]
+
+    request_url = f"{settings['base_url']}/{path.lstrip('/')}"
+    raw_payload = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+    openai_request = urllib.request.Request(request_url, data=raw_payload, headers=headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(openai_request, timeout=settings["timeout_seconds"]) as response:
+            raw_body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raw_body = exc.read().decode("utf-8", errors="replace")
+        message = "Falha ao consultar a IA."
+        try:
+            error_payload = json.loads(raw_body)
+            error_info = error_payload.get("error")
+            if isinstance(error_info, dict):
+                message = as_text(error_info.get("message")) or message
+            else:
+                message = as_text(error_payload.get("message")) or message
+        except json.JSONDecodeError:
+            pass
+        raise AppError(502, message) from exc
+    except urllib.error.URLError as exc:
+        raise AppError(502, "Nao foi possivel conectar ao servico de IA.") from exc
+
+    try:
+        return json.loads(raw_body)
+    except json.JSONDecodeError as exc:
+        raise AppError(502, "A resposta da IA veio em um formato invalido.") from exc
+
+
+def run_finance_purchase_research(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise AppError(400, "Envie um JSON valido com os dados da compra.")
+
+    prompt_payload = {
+        "desc": as_text(payload.get("desc"))[:240],
+        "fornecedor": as_text(payload.get("fornecedor"))[:180],
+        "justificativa": as_text(payload.get("justificativa"))[:500],
+        "obs": as_text(payload.get("obs"))[:500],
+        "produto_url": as_text(payload.get("produtoUrl"))[:500],
+    }
+    if len(prompt_payload["desc"]) < 3:
+        raise AppError(400, "Informe a descricao do produto para pesquisar com a IA.")
+
+    settings = finance_ai_settings()
+    response_payload = request_openai_json(
+        "responses",
+        {
+            "model": settings["model"],
+            "reasoning": {"effort": "low"},
+            "instructions": (
+                "Voce e um assistente de compras corporativas para um sistema financeiro brasileiro. "
+                "Use obrigatoriamente a ferramenta web_search antes de responder. "
+                "Retorne somente JSON valido seguindo o schema. "
+                "Priorize lojas brasileiras, valores em BRL e links diretos para paginas de produto, servico ou plano. "
+                "Nao inclua paginas de busca, comparadores genericos, blogs ou links inventados. "
+                "Classifique cada oferta em melhor_preco, custo_beneficio ou alternativa. "
+                "Ordene as ofertas do menor preco confiavel para o maior sempre que os valores forem comparaveis. "
+                "Use textos curtos e objetivos em summary e reason."
+            ),
+            "input": build_finance_purchase_research_input(prompt_payload, settings["max_offers"]),
+            "tools": [
+                {
+                    "type": "web_search",
+                    "user_location": {"type": "approximate", "country": "BR"},
+                    "search_context_size": settings["search_context_size"],
+                }
+            ],
+            "tool_choice": "required",
+            "include": ["web_search_call.action.sources"],
+            "max_output_tokens": 1800,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "finance_purchase_research",
+                    "schema": finance_purchase_research_schema(),
+                    "strict": True,
+                }
+            },
+        },
+        settings,
+    )
+
+    output_text = extract_openai_response_text(response_payload)
+    if not output_text:
+        raise AppError(502, "A Pesquisa I.A nao retornou resultados utilizaveis.")
+
+    try:
+        parsed = json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise AppError(502, "A IA retornou um formato inesperado para a pesquisa.") from exc
+
+    raw_offers = parsed.get("offers")
+    if not isinstance(raw_offers, list):
+        raise AppError(502, "A IA nao retornou uma lista de ofertas valida.")
+
+    offers: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for item in raw_offers:
+        if not isinstance(item, dict):
+            continue
+        url = as_text(item.get("url"))
+        if not re.match(r"^https?://", url) or url in seen_urls:
+            continue
+        seen_urls.add(url)
+
+        category = as_text(item.get("category"), "alternativa")
+        if category not in {"melhor_preco", "custo_beneficio", "alternativa"}:
+            category = "alternativa"
+
+        price_value = max(as_float(item.get("price_value"), 0.0), 0.0)
+        offers.append(
+            {
+                "category": category,
+                "title": as_text(item.get("title")),
+                "store": as_text(item.get("store")),
+                "url": url,
+                "priceText": as_text(item.get("price_text")),
+                "priceValue": round(price_value, 2),
+                "currency": as_text(item.get("currency"), "BRL") or "BRL",
+                "reason": as_text(item.get("reason")),
+            }
+        )
+        if len(offers) >= settings["max_offers"]:
+            break
+
+    return {
+        "ok": True,
+        "query": as_text(parsed.get("query")),
+        "summary": as_text(parsed.get("summary")),
+        "offers": offers,
+        "sources": extract_openai_response_sources(response_payload),
+        "generatedAt": now_iso(),
+        "model": settings["model"],
     }
 
 
@@ -1896,6 +2174,12 @@ def trigger_finance_reminders():
             result = run_finance_reminders(session)
 
     return jsonify(result)
+
+
+@app.post("/api/finance/purchase-research")
+def finance_purchase_research():
+    body = request.get_json(silent=True) or {}
+    return jsonify(run_finance_purchase_research(body))
 
 
 @app.get("/api/stores/<store_id>")

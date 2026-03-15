@@ -1396,6 +1396,29 @@ $("#btnCriarTitulosDoOFX").addEventListener("click", ()=>{
 
 /* ---------- Compras ---------- */
 let editCompraId = null;
+const COMPRA_AI_CATEGORY_META = {
+  melhor_preco: { title: "Melhor preco", cardClass: "best" },
+  custo_beneficio: { title: "Custo-beneficio", cardClass: "value" },
+  alternativa: { title: "Alternativas", cardClass: "" }
+};
+let compraAiState = defaultCompraAiState();
+
+function defaultCompraAiState(){
+  return {
+    loading: false,
+    error: "",
+    query: "",
+    summary: "",
+    offers: [],
+    sources: [],
+    generatedAt: "",
+    model: ""
+  };
+}
+
+function resetCompraAiState(){
+  compraAiState = defaultCompraAiState();
+}
 
 function novoPedidoCompra({requestedAt, desc, fornecedor, produtoUrl, fotoUrl, justificativa, categoriaId, contaId, centroCusto, valor, vencimento, formaPagamento, obs}){
   return {
@@ -1536,8 +1559,166 @@ function renderCompraPreview(){
     : "A solicitacao nasce como pendente. A aprovacao gera automaticamente um titulo em contas a pagar.";
 }
 
+function renderCompraAiResults(){
+  const btn = $("#btnPesquisaIA");
+  const statusBox = $("#compraAiStatus");
+  const resultsBox = $("#compraAiResultados");
+  if(!statusBox || !resultsBox) return;
+
+  if(btn){
+    btn.disabled = compraAiState.loading;
+    btn.textContent = compraAiState.loading ? "Pesquisando..." : "Pesquisa I.A";
+  }
+
+  if(compraAiState.loading){
+    statusBox.textContent = "Pesquisando ofertas atuais e organizando por faixa de preco e aderencia.";
+    resultsBox.innerHTML = `<div class="muted">Aguarde um instante, a IA esta consultando a web.</div>`;
+    return;
+  }
+
+  if(compraAiState.error){
+    statusBox.textContent = compraAiState.error;
+    resultsBox.innerHTML = `<div class="muted">${escapeHtml(compraAiState.error)}</div>`;
+    return;
+  }
+
+  if(!compraAiState.offers.length){
+    statusBox.textContent = "Descreva o item e clique em Pesquisa I.A para comparar opcoes.";
+    resultsBox.innerHTML = `<div class="muted">Nenhuma pesquisa realizada ainda.</div>`;
+    return;
+  }
+
+  statusBox.textContent = `${compraAiState.offers.length} oferta(s) encontrada(s). Escolha uma opcao para preencher a solicitacao.`;
+
+  const groups = Object.keys(COMPRA_AI_CATEGORY_META)
+    .map(category => ({
+      category,
+      meta: COMPRA_AI_CATEGORY_META[category],
+      items: compraAiState.offers
+        .map((offer, index) => ({ offer, index }))
+        .filter(entry => entry.offer.category === category)
+    }))
+    .filter(group => group.items.length);
+
+  const summaryHtml = compraAiState.summary
+    ? `<div class="aiSummary">${escapeHtml(compraAiState.summary)}</div>`
+    : "";
+
+  const queryHtml = compraAiState.query
+    ? `<div class="muted" style="margin-top:8px">Consulta: <b>${escapeHtml(compraAiState.query)}</b></div>`
+    : "";
+
+  const groupsHtml = groups.map(group => `
+    <section class="aiGroup">
+      <div class="aiGroupTitle">${escapeHtml(group.meta.title)}</div>
+      <div class="aiOfferList">
+        ${group.items.map(({offer, index}) => {
+          const priceValue = Number(offer.priceValue || 0);
+          const priceLabel = priceValue > 0 ? brl(priceValue) : (offer.priceText || "Preco nao informado");
+          const cardClass = group.meta.cardClass ? ` ${group.meta.cardClass}` : "";
+          return `
+            <article class="aiOfferCard${cardClass}">
+              <div class="aiOfferHead">
+                <div>
+                  <h4 class="aiOfferTitle">${escapeHtml(offer.title || "Oferta encontrada")}</h4>
+                  <div class="aiOfferStore">${escapeHtml(offer.store || "Loja nao informada")}</div>
+                </div>
+                <div class="aiOfferPrice">${escapeHtml(priceLabel)}</div>
+              </div>
+              <div class="aiOfferReason">${escapeHtml(offer.reason || "Link sugerido pela Pesquisa I.A.")}</div>
+              <div class="aiOfferActions">
+                <a class="btn" href="${escapeHtml(offer.url || "#")}" target="_blank" rel="noopener noreferrer">Abrir link</a>
+                <button class="btn primary" type="button" data-act="useAiOffer" data-idx="${index}">Usar esta oferta</button>
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `).join("");
+
+  const sourcesHtml = Array.isArray(compraAiState.sources) && compraAiState.sources.length
+    ? `
+      <div class="aiSources">
+        <div class="muted"><b>Fontes consultadas</b></div>
+        <ul>
+          ${compraAiState.sources.map(source => `
+            <li><a href="${escapeHtml(source.url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || source.url || "Fonte")}</a></li>
+          `).join("")}
+        </ul>
+      </div>
+    `
+    : "";
+
+  resultsBox.innerHTML = `${queryHtml}${summaryHtml}${groupsHtml}${sourcesHtml}`;
+}
+
+async function pesquisarCompraComIA(){
+  const draft = currentCompraDraft();
+  if((draft.desc || "").trim().length < 3){
+    alert("Descreva o produto ou servico antes de usar a Pesquisa I.A.");
+    return;
+  }
+
+  compraAiState = {
+    ...defaultCompraAiState(),
+    loading: true
+  };
+  renderCompraAiResults();
+
+  try{
+    const payload = await requestJson("/api/finance/purchase-research", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        desc: draft.desc,
+        fornecedor: draft.fornecedor,
+        justificativa: draft.justificativa,
+        obs: draft.obs,
+        produtoUrl: draft.produtoUrl
+      })
+    });
+
+    compraAiState = {
+      ...defaultCompraAiState(),
+      query: payload?.query || draft.desc,
+      summary: payload?.summary || "",
+      offers: Array.isArray(payload?.offers) ? payload.offers : [],
+      sources: Array.isArray(payload?.sources) ? payload.sources : [],
+      generatedAt: payload?.generatedAt || "",
+      model: payload?.model || ""
+    };
+  }catch(err){
+    compraAiState = {
+      ...defaultCompraAiState(),
+      error: err?.message || "Nao foi possivel executar a Pesquisa I.A."
+    };
+  }
+
+  renderCompraAiResults();
+}
+
+function aplicarOfertaPesquisaIA(index){
+  const offer = compraAiState.offers[index];
+  if(!offer) return;
+
+  $("#pcFornecedor").value = offer.store || $("#pcFornecedor").value;
+  $("#pcProdutoUrl").value = offer.url || $("#pcProdutoUrl").value;
+
+  const priceValue = Number(offer.priceValue || 0);
+  if(Number.isFinite(priceValue) && priceValue > 0){
+    $("#pcValor").value = String(priceValue);
+  }
+  if(!$("#pcDesc").value.trim()){
+    $("#pcDesc").value = offer.title || "";
+  }
+
+  renderCompraPreview();
+}
+
 function openCompraModal(id=null){
   editCompraId = id;
+  resetCompraAiState();
   $("#modalCompra").classList.remove("hidden");
   $("#modalCompraTitle").textContent = id ? "Editar solicitacao de compra" : "Nova solicitacao de compra";
 
@@ -1556,10 +1737,13 @@ function openCompraModal(id=null){
   $("#pcValor").value = compra ? Number(compra.valor || 0) : "";
   $("#pcObs").value = compra?.obs || "";
   renderCompraPreview();
+  renderCompraAiResults();
 }
 
 function closeCompraModal(){
   $("#modalCompra").classList.add("hidden");
+  resetCompraAiState();
+  renderCompraAiResults();
   editCompraId = null;
 }
 
@@ -1632,6 +1816,12 @@ $("#btnCancelarCompra")?.addEventListener("click", closeCompraModal);
 $("#modalCompra")?.addEventListener("click", (e)=>{ if(e.target.id === "modalCompra") closeCompraModal(); });
 $("#pcFotoUrl")?.addEventListener("input", renderCompraPreview);
 $("#pcProdutoUrl")?.addEventListener("input", renderCompraPreview);
+$("#btnPesquisaIA")?.addEventListener("click", pesquisarCompraComIA);
+$("#compraAiResultados")?.addEventListener("click", (e)=>{
+  const btn = e.target.closest("button[data-act='useAiOffer']");
+  if(!btn) return;
+  aplicarOfertaPesquisaIA(Number(btn.dataset.idx));
+});
 
 $("#btnSalvarCompra")?.addEventListener("click", ()=>{
   const draft = currentCompraDraft();

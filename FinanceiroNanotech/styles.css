@@ -354,6 +354,119 @@ textarea{
   display:block;
 }
 
+.aiAssistBar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  padding: 12px;
+  border:1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(15,23,48,.35);
+}
+
+.aiAssistStatus{
+  flex:1;
+  min-width: 240px;
+}
+
+.aiResultsPanel{
+  min-height: 180px;
+}
+
+.aiSummary{
+  margin: 10px 0 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.aiGroup{
+  margin-top: 14px;
+}
+
+.aiGroupTitle{
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.aiOfferList{
+  display:grid;
+  gap: 10px;
+}
+
+.aiOfferCard{
+  border:1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(15,23,48,.42);
+  padding: 12px;
+}
+
+.aiOfferCard.best{
+  border-color: rgba(94,234,212,.35);
+  background: linear-gradient(135deg, rgba(94,234,212,.08), rgba(96,165,250,.08));
+}
+
+.aiOfferCard.value{
+  border-color: rgba(96,165,250,.35);
+}
+
+.aiOfferHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 12px;
+  flex-wrap:wrap;
+}
+
+.aiOfferTitle{
+  margin:0;
+  font-size: 14px;
+}
+
+.aiOfferStore{
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.aiOfferPrice{
+  font-size: 20px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.aiOfferReason{
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.aiOfferActions{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  margin-top: 12px;
+}
+
+.aiSources{
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.aiSources ul{
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.aiSources a{
+  color: var(--accent);
+}
+
 .footer{
   padding: 10px 16px 18px;
   text-align:center;

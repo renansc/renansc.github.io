@@ -460,6 +460,13 @@
               <textarea id="pcJustificativa" rows="4" placeholder="Explique por que a compra precisa ser aprovada."></textarea>
             </label>
 
+            <div class="span2 aiAssistBar">
+              <button class="btn" id="btnPesquisaIA" type="button">Pesquisa I.A</button>
+              <div class="muted aiAssistStatus" id="compraAiStatus">
+                Descreva o produto e clique em Pesquisa I.A para receber links organizados por preco e aderencia.
+              </div>
+            </div>
+
             <label>Conta do contas a pagar
               <select id="pcConta"></select>
             </label>
@@ -498,6 +505,20 @@
               <div id="compraLinkPreview" class="muted">Informe o link do produto para facilitar a aprovacao.</div>
               <div class="divider"></div>
               <div id="compraStatusInfo" class="muted">A solicitacao nasce como pendente. A aprovacao gera automaticamente um titulo em contas a pagar.</div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="previewBox aiResultsPanel">
+            <div class="row gap wrap" style="justify-content:space-between">
+              <div>
+                <div><b>Resultados da Pesquisa I.A</b></div>
+                <div class="muted">Use uma oferta para preencher fornecedor, link e valor estimado.</div>
+              </div>
+            </div>
+            <div id="compraAiResultados" class="muted" style="margin-top:10px">
+              Nenhuma pesquisa realizada ainda.
             </div>
           </div>
 
