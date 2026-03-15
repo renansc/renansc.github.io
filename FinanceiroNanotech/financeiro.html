@@ -708,6 +708,34 @@
             Configure no servidor: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FINANCE_REMINDER_TO e FINANCE_REMINDER_FROM.
           </div>
         </div>
+
+        <div class="card">
+          <div class="cardhead">
+            <h2>Diagnostico da I.A</h2>
+            <div class="muted">Verifica se a OpenAI esta configurada e se o modelo responde no servidor.</div>
+          </div>
+
+          <div class="row gap wrap">
+            <span class="badge warn" id="aiStatusBadge">Verificando...</span>
+            <span class="muted" id="aiStatusCheckedAt">Aguardando leitura do servidor.</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="statusBox" id="aiStatusMessage">Carregando diagnostico da I.A...</div>
+
+          <div class="diagGrid" id="aiStatusDetails">
+            <div class="diagItem">
+              <div class="diagLabel">Chave</div>
+              <div class="diagValue">-</div>
+            </div>
+          </div>
+
+          <div class="row gap wrap" style="margin-top:14px">
+            <button class="btn primary" id="btnAtualizarAiStatus">Atualizar status</button>
+            <span class="muted">Se a chave nao aparecer aqui, o problema esta no ambiente do servidor, nao no botao da pesquisa.</span>
+          </div>
+        </div>
       </div>
     </section>
   </main>

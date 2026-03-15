@@ -420,6 +420,197 @@ def finance_ai_settings() -> dict[str, Any]:
     }
 
 
+def openai_request_headers(settings: dict[str, Any], *, include_json: bool = True) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {settings['api_key']}"}
+    if include_json:
+        headers["Content-Type"] = "application/json"
+    if settings["organization"]:
+        headers["OpenAI-Organization"] = settings["organization"]
+    if settings["project"]:
+        headers["OpenAI-Project"] = settings["project"]
+    return headers
+
+
+def parse_openai_error_message(raw_body: str, fallback: str = "Falha ao consultar a IA.") -> str:
+    try:
+        error_payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return fallback
+
+    error_info = error_payload.get("error")
+    if isinstance(error_info, dict):
+        return as_text(error_info.get("message")) or fallback
+    return as_text(error_payload.get("message")) or fallback
+
+
+def send_openai_request(
+    path: str,
+    settings: dict[str, Any],
+    *,
+    method: str = "POST",
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if not settings["enabled"] or not settings["api_key"]:
+        raise AppError(503, "Configure OPENAI_API_KEY no servidor para usar a Pesquisa I.A.")
+
+    request_url = f"{settings['base_url']}/{path.lstrip('/')}"
+    raw_payload = json.dumps(payload, ensure_ascii=True).encode("utf-8") if payload is not None else None
+    openai_request = urllib.request.Request(
+        request_url,
+        data=raw_payload,
+        headers=openai_request_headers(settings, include_json=payload is not None),
+        method=method,
+    )
+
+    try:
+        with urllib.request.urlopen(openai_request, timeout=settings["timeout_seconds"]) as response:
+            return {
+                "ok": True,
+                "status_code": response.status,
+                "body": response.read().decode("utf-8"),
+            }
+    except urllib.error.HTTPError as exc:
+        return {
+            "ok": False,
+            "status_code": exc.code,
+            "body": exc.read().decode("utf-8", errors="replace"),
+        }
+    except urllib.error.URLError as exc:
+        raise AppError(502, "Nao foi possivel conectar ao servico de IA.") from exc
+
+
+def mask_secret_hint(secret: str) -> str:
+    clean = as_text(secret)
+    if not clean:
+        return ""
+    if len(clean) <= 8:
+        return "*" * len(clean)
+    return f"{clean[:6]}...{clean[-4:]}"
+
+
+def build_finance_ai_diagnostic(*, probe: bool = False) -> dict[str, Any]:
+    settings = finance_ai_settings()
+    api_key = settings["api_key"]
+    key_present = bool(api_key)
+    key_looks_valid = api_key.startswith("sk-") if api_key else False
+
+    result = {
+        "ok": True,
+        "checkedAt": now_iso(),
+        "config": {
+            "apiKeyPresent": key_present,
+            "apiKeyLooksValid": key_looks_valid,
+            "apiKeyHint": mask_secret_hint(api_key),
+            "model": settings["model"],
+            "baseUrl": settings["base_url"],
+            "organizationPresent": bool(settings["organization"]),
+            "projectPresent": bool(settings["project"]),
+        },
+        "status": {
+            "level": "warn",
+            "code": "not_tested",
+            "message": "Chave detectada localmente. Clique em atualizar para validar a conexao com a OpenAI.",
+        },
+        "probe": {
+            "attempted": probe,
+            "success": False,
+            "httpStatus": None,
+            "message": "",
+            "modelId": "",
+        },
+    }
+
+    if not key_present:
+        result["status"] = {
+            "level": "bad",
+            "code": "missing_key",
+            "message": "OPENAI_API_KEY nao foi encontrada no processo do servidor.",
+        }
+        result["probe"]["message"] = "Defina OPENAI_API_KEY no ambiente do servico e reinicie o deploy."
+        return result
+
+    if not key_looks_valid:
+        result["status"] = {
+            "level": "warn",
+            "code": "unexpected_key_format",
+            "message": "A chave esta presente, mas o formato nao parece ser uma secret key padrao da OpenAI.",
+        }
+
+    if not probe:
+        return result
+
+    try:
+        response = send_openai_request(
+            f"models/{quote(settings['model'], safe='')}",
+            settings,
+            method="GET",
+            payload=None,
+        )
+    except AppError as exc:
+        result["status"] = {
+            "level": "bad",
+            "code": "network_error",
+            "message": str(exc),
+        }
+        result["probe"]["message"] = str(exc)
+        return result
+    result["probe"]["httpStatus"] = response["status_code"]
+
+    if response["ok"]:
+        payload = json.loads(response["body"])
+        model_id = as_text(payload.get("id")) or settings["model"]
+        result["probe"].update(
+            {
+                "success": True,
+                "message": "Conexao com a OpenAI funcionando e modelo acessivel para este projeto.",
+                "modelId": model_id,
+            }
+        )
+        result["status"] = {
+            "level": "ok",
+            "code": "connected",
+            "message": f"OpenAI conectada com sucesso usando o modelo {model_id}.",
+        }
+        return result
+
+    status_code = response["status_code"]
+    message = parse_openai_error_message(response["body"], "Falha ao validar a configuracao da OpenAI.")
+    result["probe"]["message"] = message
+
+    if status_code == 401:
+        result["status"] = {
+            "level": "bad",
+            "code": "auth_error",
+            "message": "A chave foi encontrada, mas a OpenAI recusou a autenticacao.",
+        }
+    elif status_code == 403:
+        result["status"] = {
+            "level": "bad",
+            "code": "forbidden",
+            "message": "A chave existe, mas este projeto ou organizacao nao tem permissao para acessar a API/modelo.",
+        }
+    elif status_code == 404:
+        result["status"] = {
+            "level": "bad",
+            "code": "model_not_found",
+            "message": f"O modelo configurado ({settings['model']}) nao foi encontrado ou nao esta disponivel para a chave atual.",
+        }
+    elif status_code == 429:
+        result["status"] = {
+            "level": "warn",
+            "code": "rate_limited",
+            "message": "A OpenAI respondeu com limite de uso ou falta de creditos.",
+        }
+    else:
+        result["status"] = {
+            "level": "bad",
+            "code": "api_error",
+            "message": "A OpenAI respondeu com erro ao validar a configuracao.",
+        }
+
+    return result
+
+
 def finance_purchase_research_schema() -> dict[str, Any]:
     return {
         "type": "object",
@@ -530,40 +721,10 @@ def extract_openai_response_sources(response_payload: dict[str, Any]) -> list[di
 
 
 def request_openai_json(path: str, payload: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any]:
-    if not settings["enabled"] or not settings["api_key"]:
-        raise AppError(503, "Configure OPENAI_API_KEY no servidor para usar a Pesquisa I.A.")
-
-    headers = {
-        "Authorization": f"Bearer {settings['api_key']}",
-        "Content-Type": "application/json",
-    }
-    if settings["organization"]:
-        headers["OpenAI-Organization"] = settings["organization"]
-    if settings["project"]:
-        headers["OpenAI-Project"] = settings["project"]
-
-    request_url = f"{settings['base_url']}/{path.lstrip('/')}"
-    raw_payload = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-    openai_request = urllib.request.Request(request_url, data=raw_payload, headers=headers, method="POST")
-
-    try:
-        with urllib.request.urlopen(openai_request, timeout=settings["timeout_seconds"]) as response:
-            raw_body = response.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        raw_body = exc.read().decode("utf-8", errors="replace")
-        message = "Falha ao consultar a IA."
-        try:
-            error_payload = json.loads(raw_body)
-            error_info = error_payload.get("error")
-            if isinstance(error_info, dict):
-                message = as_text(error_info.get("message")) or message
-            else:
-                message = as_text(error_payload.get("message")) or message
-        except json.JSONDecodeError:
-            pass
-        raise AppError(502, message) from exc
-    except urllib.error.URLError as exc:
-        raise AppError(502, "Nao foi possivel conectar ao servico de IA.") from exc
+    response = send_openai_request(path, settings, method="POST", payload=payload)
+    raw_body = response["body"]
+    if not response["ok"]:
+        raise AppError(502, parse_openai_error_message(raw_body)) from None
 
     try:
         return json.loads(raw_body)
@@ -2185,6 +2346,12 @@ def trigger_finance_reminders():
             result = run_finance_reminders(session)
 
     return jsonify(result)
+
+
+@app.get("/api/finance/ai-status")
+def finance_ai_status():
+    probe = parse_bool(request.args.get("probe"), False)
+    return jsonify(build_finance_ai_diagnostic(probe=probe))
 
 
 @app.post("/api/finance/purchase-research")

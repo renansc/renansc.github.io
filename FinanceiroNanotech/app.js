@@ -22,6 +22,13 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 /* ---------- Estado ---------- */
 let state = loadState();
+let financeAiDiagState = {
+  loading: false,
+  loaded: false,
+  error: "",
+  data: null,
+  lastLoadedAt: 0
+};
 
 /* ---------- Util ---------- */
 function uid(prefix="id"){
@@ -37,6 +44,12 @@ function toISODate(d){
   const m = String(dt.getMonth()+1).padStart(2,"0");
   const da = String(dt.getDate()).padStart(2,"0");
   return `${y}-${m}-${da}`;
+}
+function formatDateTime(value){
+  if(!value) return "-";
+  const dt = new Date(value);
+  if(Number.isNaN(dt.getTime())) return String(value);
+  return dt.toLocaleString("pt-BR");
 }
 function parseISODate(s){
   const [y,m,d] = s.split("-").map(Number);
@@ -2304,10 +2317,184 @@ $("#listaAnexos").addEventListener("click", async (e)=>{
 });
 
 /* ---------- Config ---------- */
+function financeAiBadgeClass(level){
+  if(level === "ok") return "ok";
+  if(level === "bad") return "bad";
+  return "warn";
+}
+
+function financeAiBadgeLabel(code, level){
+  if(code === "connected") return "Conectado";
+  if(code === "missing_key") return "Sem chave";
+  if(code === "auth_error") return "Autenticacao";
+  if(code === "model_not_found") return "Modelo";
+  if(code === "forbidden") return "Permissao";
+  if(code === "rate_limited") return "Limite";
+  if(code === "network_error") return "Rede";
+  if(code === "api_error") return "Erro API";
+  if(level === "ok") return "Pronto";
+  if(level === "bad") return "Falha";
+  return "Atencao";
+}
+
+function renderFinanceAiStatus(){
+  const badge = $("#aiStatusBadge");
+  const checkedAt = $("#aiStatusCheckedAt");
+  const messageBox = $("#aiStatusMessage");
+  const detailsBox = $("#aiStatusDetails");
+  const refreshBtn = $("#btnAtualizarAiStatus");
+  if(!badge || !checkedAt || !messageBox || !detailsBox) return;
+
+  if(refreshBtn){
+    refreshBtn.disabled = financeAiDiagState.loading;
+    refreshBtn.textContent = financeAiDiagState.loading ? "Atualizando..." : "Atualizar status";
+  }
+
+  if(financeAiDiagState.loading){
+    badge.className = "badge warn";
+    badge.textContent = "Verificando...";
+    checkedAt.textContent = "Consultando o servidor e a OpenAI.";
+    messageBox.className = "statusBox";
+    messageBox.textContent = "Executando diagnostico da I.A. Aguarde um instante.";
+    detailsBox.innerHTML = `
+      <div class="diagItem"><div class="diagLabel">Servidor</div><div class="diagValue">Lendo configuracao...</div></div>
+      <div class="diagItem"><div class="diagLabel">OpenAI</div><div class="diagValue">Validando modelo...</div></div>
+    `;
+    return;
+  }
+
+  if(financeAiDiagState.error){
+    badge.className = "badge bad";
+    badge.textContent = "Falha";
+    checkedAt.textContent = "Nao foi possivel consultar o diagnostico.";
+    messageBox.className = "statusBox bad";
+    messageBox.textContent = financeAiDiagState.error;
+    detailsBox.innerHTML = `
+      <div class="diagItem">
+        <div class="diagLabel">Sugestao</div>
+        <div class="diagValue">Confira se o servidor foi redeployado corretamente e se a rota /api/finance/ai-status esta respondendo.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const payload = financeAiDiagState.data;
+  if(!payload){
+    badge.className = "badge warn";
+    badge.textContent = "Pendente";
+    checkedAt.textContent = "Nenhum diagnostico executado ainda.";
+    messageBox.className = "statusBox";
+    messageBox.textContent = "Abra esta aba ou clique em atualizar para verificar a configuracao da OpenAI.";
+    detailsBox.innerHTML = "";
+    return;
+  }
+
+  const status = payload.status || {};
+  const probe = payload.probe || {};
+  const config = payload.config || {};
+  const level = financeAiBadgeClass(status.level);
+
+  badge.className = `badge ${level}`;
+  badge.textContent = financeAiBadgeLabel(status.code, status.level);
+  checkedAt.textContent = `Ultima verificacao: ${formatDateTime(payload.checkedAt)}`;
+  messageBox.className = `statusBox ${level}`;
+  messageBox.textContent = status.message || "Diagnostico carregado.";
+
+  detailsBox.innerHTML = [
+    {
+      label: "Variavel esperada",
+      value: "OPENAI_API_KEY"
+    },
+    {
+      label: "Chave no servidor",
+      value: config.apiKeyPresent
+        ? `Detectada${config.apiKeyHint ? ` (${config.apiKeyHint})` : ""}`
+        : "Nao detectada"
+    },
+    {
+      label: "Formato da chave",
+      value: !config.apiKeyPresent ? "-" : (config.apiKeyLooksValid ? "Parece valido" : "Formato inesperado")
+    },
+    {
+      label: "Modelo configurado",
+      value: config.model || "-"
+    },
+    {
+      label: "Base URL",
+      value: config.baseUrl || "-"
+    },
+    {
+      label: "Projeto OpenAI",
+      value: config.projectPresent ? "Informado" : "Nao informado"
+    },
+    {
+      label: "Organizacao",
+      value: config.organizationPresent ? "Informada" : "Nao informada"
+    },
+    {
+      label: "Teste remoto",
+      value: probe.attempted ? (probe.success ? "Conexao validada" : "Falhou") : "Nao executado"
+    },
+    {
+      label: "HTTP OpenAI",
+      value: probe.httpStatus || "-"
+    },
+    {
+      label: "Detalhe da OpenAI",
+      value: probe.message || "Sem detalhe adicional."
+    }
+  ].map(item => `
+    <div class="diagItem">
+      <div class="diagLabel">${escapeHtml(item.label)}</div>
+      <div class="diagValue">${escapeHtml(String(item.value || "-"))}</div>
+    </div>
+  `).join("");
+}
+
+async function loadFinanceAiStatus({force=false}={}){
+  if(!$("#aiStatusBadge")) return;
+  if(financeAiDiagState.loading) return;
+
+  const now = Date.now();
+  if(!force && financeAiDiagState.loaded && (now - financeAiDiagState.lastLoadedAt) < 30000){
+    renderFinanceAiStatus();
+    return;
+  }
+
+  financeAiDiagState.loading = true;
+  financeAiDiagState.error = "";
+  renderFinanceAiStatus();
+
+  try{
+    const payload = await requestJson("/api/finance/ai-status?probe=1");
+    financeAiDiagState = {
+      loading: false,
+      loaded: true,
+      error: "",
+      data: payload,
+      lastLoadedAt: Date.now()
+    };
+  }catch(err){
+    financeAiDiagState = {
+      loading: false,
+      loaded: false,
+      error: err?.message || "Nao foi possivel carregar o diagnostico da I.A.",
+      data: null,
+      lastLoadedAt: 0
+    };
+  }
+
+  renderFinanceAiStatus();
+}
+
 function renderConfig(){
   $("#cfgTolDias").value = state.config.tolDias;
   $("#cfgTolValor").value = state.config.tolValor;
   $("#cfgScoreMin").value = state.config.scoreMin;
+  renderFinanceAiStatus();
+  if(!$("#view-config")?.classList.contains("hidden")){
+    loadFinanceAiStatus();
+  }
 }
 $("#btnSalvarCfg").addEventListener("click", ()=>{
   state.config.tolDias = clamp(Number($("#cfgTolDias").value), 0, 30);
@@ -2317,6 +2504,7 @@ $("#btnSalvarCfg").addEventListener("click", ()=>{
   alert("Config salva.");
 });
 $("#btnRodarAvisos")?.addEventListener("click", ()=> triggerFinanceReminders());
+$("#btnAtualizarAiStatus")?.addEventListener("click", ()=> loadFinanceAiStatus({ force: true }));
 
 /* ---------- Backup JSON ---------- */
 $("#btnExportJSON").addEventListener("click", ()=>{
