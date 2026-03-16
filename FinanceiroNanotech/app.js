@@ -165,6 +165,7 @@ function migrate(d){
   if(!d.contas) d.contas = [];
   if(!d.titulos) d.titulos = [];
   if(!d.compras) d.compras = [];
+  d.compras = Array.isArray(d.compras) ? d.compras.map(normalizeCompraRecord) : [];
   return d;
 }
 function seed(){
@@ -1425,7 +1426,9 @@ function defaultCompraAiState(){
     offers: [],
     sources: [],
     generatedAt: "",
-    model: ""
+    model: "",
+    selectedOfferIndex: -1,
+    selectedOffer: null
   };
 }
 
@@ -1433,7 +1436,67 @@ function resetCompraAiState(){
   compraAiState = defaultCompraAiState();
 }
 
-function novoPedidoCompra({requestedAt, desc, fornecedor, produtoUrl, fotoUrl, justificativa, categoriaId, contaId, centroCusto, valor, vencimento, formaPagamento, obs}){
+function cloneCompraAiPayload(item){
+  if(!item || typeof item !== "object") return null;
+  try{
+    return JSON.parse(JSON.stringify(item));
+  }catch{
+    return null;
+  }
+}
+
+function buildPersistedCompraAiState(aiState){
+  const persisted = {
+    query: String(aiState?.query || "").trim(),
+    summary: String(aiState?.summary || "").trim(),
+    offers: Array.isArray(aiState?.offers) ? aiState.offers.map(cloneCompraAiPayload).filter(Boolean) : [],
+    sources: Array.isArray(aiState?.sources) ? aiState.sources.map(cloneCompraAiPayload).filter(Boolean) : [],
+    generatedAt: String(aiState?.generatedAt || "").trim(),
+    model: String(aiState?.model || "").trim(),
+    selectedOfferIndex: Number.isInteger(aiState?.selectedOfferIndex) ? aiState.selectedOfferIndex : -1,
+    selectedOffer: cloneCompraAiPayload(aiState?.selectedOffer)
+  };
+
+  const hasContent = !!(
+    persisted.query ||
+    persisted.summary ||
+    persisted.offers.length ||
+    persisted.sources.length ||
+    persisted.generatedAt ||
+    persisted.model ||
+    persisted.selectedOffer
+  );
+
+  return hasContent ? persisted : null;
+}
+
+function hydrateCompraAiState(savedState){
+  const persisted = buildPersistedCompraAiState(savedState);
+  return persisted ? { ...defaultCompraAiState(), ...persisted } : defaultCompraAiState();
+}
+
+function normalizeCompraRecord(compra){
+  if(!compra || typeof compra !== "object") return compra;
+  return {
+    ...compra,
+    aiResearch: buildPersistedCompraAiState(compra.aiResearch)
+  };
+}
+
+function isSelectedCompraAiOffer(offer, index){
+  if(index === compraAiState.selectedOfferIndex) return true;
+
+  const selectedOffer = compraAiState.selectedOffer;
+  if(!selectedOffer || typeof selectedOffer !== "object") return false;
+
+  if(selectedOffer.url && offer?.url){
+    return selectedOffer.url === offer.url;
+  }
+
+  return selectedOffer.title === offer?.title && selectedOffer.store === offer?.store;
+}
+
+function novoPedidoCompra({requestedAt, desc, fornecedor, produtoUrl, fotoUrl, justificativa, categoriaId, contaId, centroCusto, valor, vencimento, formaPagamento, obs, aiResearch}){
   return {
     id: uid("compra"),
     requestedAt,
@@ -1450,6 +1513,7 @@ function novoPedidoCompra({requestedAt, desc, fornecedor, produtoUrl, fotoUrl, j
     vencimento,
     formaPagamento: (formaPagamento || "").trim(),
     obs: (obs || "").trim(),
+    aiResearch: buildPersistedCompraAiState(aiResearch),
     titleId: null,
     approvedAt: null,
     rejectedAt: null
@@ -1628,20 +1692,26 @@ function renderCompraAiResults(){
         ${group.items.map(({offer, index}) => {
           const priceValue = Number(offer.priceValue || 0);
           const priceLabel = priceValue > 0 ? brl(priceValue) : (offer.priceText || "Preco nao informado");
-          const cardClass = group.meta.cardClass ? ` ${group.meta.cardClass}` : "";
+          const cardClasses = ["aiOfferCard"];
+          const isSelected = isSelectedCompraAiOffer(offer, index);
+          if(group.meta.cardClass) cardClasses.push(group.meta.cardClass);
+          if(isSelected) cardClasses.push("selected");
           return `
-            <article class="aiOfferCard${cardClass}">
+            <article class="${cardClasses.join(" ")}">
               <div class="aiOfferHead">
                 <div>
                   <h4 class="aiOfferTitle">${escapeHtml(offer.title || "Oferta encontrada")}</h4>
                   <div class="aiOfferStore">${escapeHtml(offer.store || "Loja nao informada")}</div>
                 </div>
-                <div class="aiOfferPrice">${escapeHtml(priceLabel)}</div>
+                <div>
+                  ${isSelected ? `<div class="badge ok" style="margin-bottom:6px">Oferta selecionada</div>` : ""}
+                  <div class="aiOfferPrice">${escapeHtml(priceLabel)}</div>
+                </div>
               </div>
               <div class="aiOfferReason">${escapeHtml(offer.reason || "Link sugerido pela Pesquisa I.A.")}</div>
               <div class="aiOfferActions">
                 <a class="btn" href="${escapeHtml(offer.url || "#")}" target="_blank" rel="noopener noreferrer">Abrir link</a>
-                <button class="btn primary" type="button" data-act="useAiOffer" data-idx="${index}">Usar esta oferta</button>
+                <button class="btn primary" type="button" data-act="useAiOffer" data-idx="${index}">${isSelected ? "Oferta aplicada" : "Usar esta oferta"}</button>
               </div>
             </article>
           `;
@@ -1715,6 +1785,9 @@ function aplicarOfertaPesquisaIA(index){
   const offer = compraAiState.offers[index];
   if(!offer) return;
 
+  compraAiState.selectedOfferIndex = index;
+  compraAiState.selectedOffer = cloneCompraAiPayload(offer);
+
   $("#pcFornecedor").value = offer.store || $("#pcFornecedor").value;
   $("#pcProdutoUrl").value = offer.url || $("#pcProdutoUrl").value;
 
@@ -1727,6 +1800,7 @@ function aplicarOfertaPesquisaIA(index){
   }
 
   renderCompraPreview();
+  renderCompraAiResults();
 }
 
 function openCompraModal(id=null){
@@ -1749,6 +1823,9 @@ function openCompraModal(id=null){
   $("#pcVenc").value = compra?.vencimento || toISODate(new Date());
   $("#pcValor").value = compra ? Number(compra.valor || 0) : "";
   $("#pcObs").value = compra?.obs || "";
+  if(compra?.aiResearch){
+    compraAiState = hydrateCompraAiState(compra.aiResearch);
+  }
   renderCompraPreview();
   renderCompraAiResults();
 }
@@ -1774,7 +1851,8 @@ function currentCompraDraft(){
     formaPagamento: $("#pcFormaPagamento").value.trim(),
     vencimento: $("#pcVenc").value,
     valor: Number($("#pcValor").value),
-    obs: $("#pcObs").value.trim()
+    obs: $("#pcObs").value.trim(),
+    aiResearch: buildPersistedCompraAiState(compraAiState)
   };
 }
 
