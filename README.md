@@ -5,6 +5,7 @@ Portal com dois aplicativos estaticos e um portal principal servidos por um back
 - `FinanceiroNanotech`
 - `GPSMusical`
 - `Site` (home do portal)
+- `ProntuarioBPA` (gerenciador visual com proxy para o servico Firebird/BPA)
 
 O frontend continua usando `localStorage` como cache, mas a persistencia principal fica no backend via `/api/stores/:storeId`.
 
@@ -24,6 +25,15 @@ source .venv/bin/activate
 ```
 
 A aplicacao sobe em `http://localhost:5000`.
+
+## Modulo BPA
+
+O portal agora inclui a pagina `ProntuarioBPA/prontuario.html`, com atalho amigavel em `prontuario-bpa.html`.
+
+- O frontend conversa com o proprio backend do portal em `/api/bpa/...`
+- Esse backend faz proxy para o servico BPA externo, por padrao em `http://127.0.0.1:5002`
+- Ajuste `BPA_API_BASE_URL` no `.env` se o servico Firebird estiver em outro host/porta
+- O servico BPA esperado e o app Flask do projeto `integarapi`
 
 ## Configuracao do banco
 

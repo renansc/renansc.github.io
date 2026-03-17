@@ -1,36 +1,129 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Renan SC | Portal de Aplicativos</title>
-  <meta name="description" content="Acesso rápido aos aplicativos GPS Musical e Financeiro Nanotech." />
+  <meta
+    name="description"
+    content="Portal visual unificado para os modulos GPS Musical, Financeiro Nanotech e o novo Prontuario BPA."
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">
-        <img src="logo.png" alt="Logo Nanotech" onerror="this.style.display='none'; this.parentElement.textContent='RC';" />
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <img src="logo.png" alt="Logo Nanotech" onerror="this.style.display='none'; this.parentElement.textContent='RC';" />
+        </div>
+        <div class="brand-copy">
+          <span class="eyebrow">Portal operacional</span>
+          <h1>Renan SC</h1>
+          <p>Uma vitrine unica para abrir os sistemas com o mesmo tema visual.</p>
+        </div>
       </div>
-      <div>
-        <h1>Renan SC - Portal de Aplicativos</h1>
-        <p>Menu principal para acessar seus sistemas</p>
+
+      <div class="topbar-actions">
+        <div class="status-pill">Tema unico, acesso rapido e integracoes locais</div>
+        <nav aria-label="Menu principal">
+          <ul class="menu" id="menuLinks"></ul>
+        </nav>
       </div>
-    </div>
-    <nav aria-label="Menu principal">
-      <ul class="menu" id="menuLinks"></ul>
-    </nav>
-  </header>
+    </header>
 
-  <main class="container">
-    <section class="hero card">
-      <h2>Aplicativos disponíveis</h2>
-      <p>Escolha um aplicativo para abrir diretamente.</p>
-    </section>
+    <main class="container">
+      <section class="hero">
+        <article class="hero-copy card reveal">
+          <span class="eyebrow">Painel principal</span>
+          <h2>Ferramentas diarias com identidade visual consistente e espaco para o novo Prontuario BPA.</h2>
+          <p>
+            O portal agora destaca os modulos principais com uma apresentacao mais forte e uma rota dedicada para
+            gerenciar dados ambulatoriais conectados ao BPA via backend local.
+          </p>
 
-    <section class="apps-grid" id="appsGrid" aria-label="Lista de aplicativos"></section>
-  </main>
+          <div class="hero-actions">
+            <a class="primary-link" href="#apps">Explorar modulos</a>
+            <a class="ghost-link" href="prontuario-bpa.html">Abrir Prontuario BPA</a>
+          </div>
+
+          <dl class="hero-stats">
+            <div>
+              <dt id="appCount">3</dt>
+              <dd>modulos em destaque</dd>
+            </div>
+            <div>
+              <dt>1</dt>
+              <dd>tema visual compartilhado</dd>
+            </div>
+            <div>
+              <dt>24h</dt>
+              <dd>fluxo pronto para evolucao</dd>
+            </div>
+          </dl>
+        </article>
+
+        <aside class="hero-panel card reveal">
+          <div class="panel-head">
+            <span class="eyebrow">Destaques</span>
+            <div class="panel-badge">Pronto para crescer</div>
+          </div>
+
+          <div class="signal-grid">
+            <article>
+              <strong>Visual renovado</strong>
+              <p>Mais contraste, profundidade e hierarquia para navegar com rapidez.</p>
+            </article>
+            <article>
+              <strong>Modulo BPA</strong>
+              <p>Nova pagina pensada para atuar como gerenciador de prontuario e cadastros.</p>
+            </article>
+            <article>
+              <strong>Backend local</strong>
+              <p>O portal pode conversar com o servico Firebird sem expor o banco no navegador.</p>
+            </article>
+          </div>
+
+          <div class="hero-orbs" aria-hidden="true">
+            <span class="orb orb-a"></span>
+            <span class="orb orb-b"></span>
+            <span class="orb orb-c"></span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="band-grid reveal" aria-label="Indicadores do portal">
+        <article class="band card">
+          <span>Estrutura</span>
+          <strong>Portal central + apps dedicados</strong>
+        </article>
+        <article class="band card">
+          <span>Novo modulo</span>
+          <strong>Prontuario BPA com proxy para Firebird</strong>
+        </article>
+        <article class="band card">
+          <span>Uso diario</span>
+          <strong>Acesso direto sem perder contexto visual</strong>
+        </article>
+      </section>
+
+      <section class="section-header reveal" id="apps">
+        <div>
+          <span class="eyebrow">Modulos disponiveis</span>
+          <h3>Escolha o ambiente que deseja abrir</h3>
+        </div>
+        <p>Os atalhos abaixo seguem o mesmo tema e podem ser expandidos sem mudar a experiencia do portal.</p>
+      </section>
+
+      <section class="apps-grid" id="appsGrid" aria-label="Lista de aplicativos"></section>
+    </main>
+  </div>
 
   <script src="script.js"></script>
 </body>

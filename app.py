@@ -63,7 +63,19 @@ DEFAULT_SITE_APPS = [
         "descricao": "Controle de lancamentos, contas, categorias e conciliacao.",
         "href": "FinanceiroNanotech/financeiro.html",
     },
+    {
+        "slug": "prontuario-bpa",
+        "nome": "Prontuario BPA",
+        "descricao": "Gerenciador de atendimentos, cadastros e insercoes no BPA via backend local.",
+        "href": "prontuario-bpa.html",
+    },
 ]
+
+BPA_API_BASE_URL = str(os.getenv("BPA_API_BASE_URL", "http://127.0.0.1:5002")).strip().rstrip("/")
+try:
+    BPA_API_TIMEOUT_SECONDS = max(5, int(str(os.getenv("BPA_API_TIMEOUT_SECONDS", "20")).strip()))
+except ValueError:
+    BPA_API_TIMEOUT_SECONDS = 20
 
 
 class AppError(Exception):
@@ -218,6 +230,55 @@ def database_label(database_url: str) -> str:
     if database_url.startswith("sqlite:///"):
         return database_url.removeprefix("sqlite:///")
     return re.sub(r":[^:@/]+@", ":***@", database_url)
+
+
+def build_bpa_proxy_url(requested_path: str) -> str:
+    normalized_path = requested_path.strip().lstrip("/")
+    if not normalized_path or ".." in normalized_path:
+        raise AppError(400, "Invalid BPA API path.")
+
+    base_url = BPA_API_BASE_URL or "http://127.0.0.1:5002"
+    target = f"{base_url}/api/{normalized_path}"
+    query_string = request.query_string.decode().strip()
+    if query_string:
+        target = f"{target}?{query_string}"
+    return target
+
+
+def proxy_bpa_request(requested_path: str):
+    target_url = build_bpa_proxy_url(requested_path)
+    request_body = request.get_data() or None
+    headers = {"Accept": request.headers.get("Accept", "application/json")}
+    if request.content_type:
+        headers["Content-Type"] = request.content_type
+
+    proxy_request = urllib.request.Request(
+        target_url,
+        data=request_body,
+        headers=headers,
+        method=request.method.upper(),
+    )
+
+    try:
+        with urllib.request.urlopen(proxy_request, timeout=BPA_API_TIMEOUT_SECONDS) as response:
+            payload = response.read()
+            content_type = response.headers.get("Content-Type", "application/json; charset=utf-8")
+            return app.response_class(payload, status=response.status, content_type=content_type)
+    except urllib.error.HTTPError as exc:
+        payload = exc.read()
+        content_type = exc.headers.get("Content-Type", "application/json; charset=utf-8") if exc.headers else "application/json; charset=utf-8"
+        return app.response_class(payload, status=exc.code, content_type=content_type)
+    except urllib.error.URLError as exc:
+        return (
+            jsonify(
+                {
+                    "error": "Servico BPA indisponivel.",
+                    "detail": str(getattr(exc, "reason", exc)),
+                    "baseUrl": BPA_API_BASE_URL,
+                }
+            ),
+            502,
+        )
 
 
 def as_text(value: Any, default: str = "") -> str:
@@ -2254,6 +2315,11 @@ def get_site_apps():
         updated_at = get_store_updated_at(session, STORE_SITE)
 
     return jsonify({"apps": apps, "updatedAt": updated_at})
+
+
+@app.route("/api/bpa/<path:requested_path>", methods=["GET", "POST", "PUT", "DELETE"])
+def proxy_bpa_api(requested_path: str):
+    return proxy_bpa_request(requested_path)
 
 
 @app.get("/api/finance/attachments/<path:attachment_path>")
