@@ -76,22 +76,34 @@ const loginForm = document.getElementById("loginForm");
 const passwordInput = document.getElementById("passwordInput");
 const authFeedback = document.getElementById("authFeedback");
 const logoutButton = document.getElementById("logoutButton");
+let memoryAuthenticated = false;
 
 function countLinks() {
   return portalApps.filter((app) => app.href).length;
 }
 
 function isAuthenticated() {
-  return localStorage.getItem(DEMO_AUTH_KEY) === "true";
+  try {
+    return localStorage.getItem(DEMO_AUTH_KEY) === "true";
+  } catch (error) {
+    return memoryAuthenticated;
+  }
 }
 
 function setAuthenticated(value) {
-  localStorage.setItem(DEMO_AUTH_KEY, value ? "true" : "false");
+  memoryAuthenticated = Boolean(value);
+  try {
+    localStorage.setItem(DEMO_AUTH_KEY, value ? "true" : "false");
+  } catch (error) {
+    // Fallback para navegadores que bloqueiam storage local.
+  }
 }
 
 function setAuthenticatedState(authenticated) {
   authScreen.classList.toggle("is-hidden", authenticated);
   portalShell.classList.toggle("is-hidden", !authenticated);
+  authScreen.hidden = authenticated;
+  portalShell.hidden = !authenticated;
 
   if (authenticated) {
     passwordInput.value = "";
@@ -164,6 +176,7 @@ loginForm?.addEventListener("submit", (event) => {
     return;
   }
 
+  authFeedback.textContent = "Acesso liberado.";
   setAuthenticated(true);
   setAuthenticatedState(true);
 });
