@@ -128,6 +128,53 @@ button {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%), var(--panel-strong);
 }
 
+.oauth-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.oauth-label {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.github-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 16px;
+  text-decoration: none;
+  color: var(--text);
+  background: linear-gradient(135deg, #111827, #1f2937);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+.auth-divider {
+  position: relative;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-divider span {
+  position: relative;
+  padding: 0 12px;
+  background: var(--panel-strong);
+}
+
 .field {
   display: grid;
   gap: 10px;
@@ -260,6 +307,15 @@ button {
   font-size: 0.84rem;
 }
 
+.user-pill {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
 .menu {
   list-style: none;
   display: flex;
@@ -274,7 +330,8 @@ button {
 .primary-link,
 .ghost-link,
 .app-link,
-.submenu-link {
+.submenu-link,
+.github-login {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -702,12 +759,14 @@ button {
 
   .menu a,
   .status-pill,
+  .user-pill,
   .logout-button,
   .primary-link,
   .ghost-link,
   .app-link,
   .submenu-link,
-  .auth-submit {
+  .auth-submit,
+  .github-login {
     width: 100%;
     justify-content: center;
   }

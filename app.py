@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import smtplib
+import ssl
 import unicodedata
 import urllib.error
 import urllib.request
@@ -17,11 +18,11 @@ from email.message import EmailMessage
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from dotenv import load_dotenv
 from finance_research import DEFAULT_ALLOWED_DOMAINS, DEFAULT_USER_AGENT, ScraperError, build_scraper_diagnostic, run_scraper_purchase_research
-from flask import Flask, abort, jsonify, request, send_from_directory, session
+from flask import Flask, abort, jsonify, redirect, request, send_from_directory, session
 from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, delete, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
@@ -81,6 +82,16 @@ except ValueError:
 
 PORTAL_PASSWORD = str(os.getenv("PORTAL_PASSWORD", "")).strip()
 PORTAL_SESSION_KEY = "portal_authenticated"
+PORTAL_USER_KEY = "portal_user"
+GITHUB_OAUTH_CLIENT_ID = str(os.getenv("GITHUB_OAUTH_CLIENT_ID", "")).strip()
+GITHUB_OAUTH_CLIENT_SECRET = str(os.getenv("GITHUB_OAUTH_CLIENT_SECRET", "")).strip()
+GITHUB_OAUTH_CALLBACK_URL = str(os.getenv("GITHUB_OAUTH_CALLBACK_URL", "")).strip()
+GITHUB_ALLOWED_USERS = {
+    item.strip().lower()
+    for item in str(os.getenv("GITHUB_ALLOWED_USERS", "")).split(",")
+    if item.strip()
+}
+GITHUB_OAUTH_STATE_KEY = "github_oauth_state"
 
 
 class AppError(Exception):
@@ -2315,7 +2326,7 @@ def healthcheck():
 
 
 def portal_auth_enabled() -> bool:
-    return bool(PORTAL_PASSWORD)
+    return bool(PORTAL_PASSWORD or github_oauth_enabled())
 
 
 def portal_is_authenticated() -> bool:
@@ -2324,12 +2335,40 @@ def portal_is_authenticated() -> bool:
     return bool(session.get(PORTAL_SESSION_KEY))
 
 
+def github_oauth_enabled() -> bool:
+    return bool(GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET)
+
+
+def github_callback_url() -> str:
+    if GITHUB_OAUTH_CALLBACK_URL:
+        return GITHUB_OAUTH_CALLBACK_URL
+    return "http://127.0.0.1:5000/auth/github/callback"
+
+
+def fetch_json(url: str, *, method: str = "GET", headers: dict[str, str] | None = None, data: dict[str, Any] | None = None) -> Any:
+    payload = None
+    request_headers = headers.copy() if headers else {}
+    if data is not None:
+        payload = urlencode(data).encode("utf-8")
+        request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+    request_headers.setdefault("Accept", "application/json")
+    request_headers.setdefault("User-Agent", DEFAULT_USER_AGENT)
+    request = urllib.request.Request(url, headers=request_headers, data=payload, method=method)
+    with urllib.request.urlopen(request, timeout=20, context=ssl.create_default_context()) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 @app.get("/api/auth/status")
 def auth_status():
     return jsonify(
         {
             "enabled": portal_auth_enabled(),
             "authenticated": portal_is_authenticated(),
+            "providers": {
+                "password": bool(PORTAL_PASSWORD),
+                "github": github_oauth_enabled(),
+            },
+            "user": session.get(PORTAL_USER_KEY),
         }
     )
 
@@ -2348,13 +2387,102 @@ def auth_login():
         return jsonify({"error": "Senha invalida."}), 401
 
     session[PORTAL_SESSION_KEY] = True
+    session[PORTAL_USER_KEY] = {"provider": "password", "login": "local"}
     return jsonify({"ok": True, "authenticated": True, "enabled": True})
 
 
 @app.post("/api/auth/logout")
 def auth_logout():
     session.pop(PORTAL_SESSION_KEY, None)
+    session.pop(PORTAL_USER_KEY, None)
+    session.pop(GITHUB_OAUTH_STATE_KEY, None)
     return jsonify({"ok": True, "authenticated": False})
+
+
+@app.get("/auth/github/start")
+def github_auth_start():
+    if not github_oauth_enabled():
+        abort(404)
+
+    state = secrets.token_urlsafe(24)
+    session[GITHUB_OAUTH_STATE_KEY] = state
+    query = urlencode(
+        {
+            "client_id": GITHUB_OAUTH_CLIENT_ID,
+            "redirect_uri": github_callback_url(),
+            "scope": "read:user",
+            "state": state,
+        }
+    )
+    return redirect(f"https://github.com/login/oauth/authorize?{query}", code=302)
+
+
+@app.get("/auth/github/callback")
+def github_auth_callback():
+    if not github_oauth_enabled():
+        abort(404)
+
+    error = str(request.args.get("error", "")).strip()
+    if error:
+        return redirect("/?auth_error=github_access_denied", code=302)
+
+    state = str(request.args.get("state", "")).strip()
+    expected_state = str(session.get(GITHUB_OAUTH_STATE_KEY, "")).strip()
+    if not state or not expected_state or not hmac.compare_digest(state, expected_state):
+        return redirect("/?auth_error=github_invalid_state", code=302)
+
+    code = str(request.args.get("code", "")).strip()
+    if not code:
+        return redirect("/?auth_error=github_missing_code", code=302)
+
+    try:
+        token_payload = fetch_json(
+            "https://github.com/login/oauth/access_token",
+            method="POST",
+            data={
+                "client_id": GITHUB_OAUTH_CLIENT_ID,
+                "client_secret": GITHUB_OAUTH_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": github_callback_url(),
+                "state": state,
+            },
+        )
+        access_token = str(token_payload.get("access_token", "")).strip()
+        if not access_token:
+            raise RuntimeError("Missing access token.")
+
+        user_payload = fetch_json(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        login = str(user_payload.get("login", "")).strip()
+        user_id = user_payload.get("id")
+        avatar_url = str(user_payload.get("avatar_url", "")).strip()
+        profile_url = str(user_payload.get("html_url", "")).strip()
+
+        if not login or not user_id:
+            raise RuntimeError("Missing GitHub user data.")
+
+        if GITHUB_ALLOWED_USERS and login.lower() not in GITHUB_ALLOWED_USERS:
+            session.pop(PORTAL_SESSION_KEY, None)
+            session.pop(PORTAL_USER_KEY, None)
+            return redirect("/?auth_error=github_user_not_allowed", code=302)
+
+        session[PORTAL_SESSION_KEY] = True
+        session[PORTAL_USER_KEY] = {
+            "provider": "github",
+            "login": login,
+            "id": user_id,
+            "avatarUrl": avatar_url,
+            "profileUrl": profile_url,
+        }
+        session.pop(GITHUB_OAUTH_STATE_KEY, None)
+        return redirect("/", code=302)
+    except Exception:
+        session.pop(PORTAL_SESSION_KEY, None)
+        session.pop(PORTAL_USER_KEY, None)
+        session.pop(GITHUB_OAUTH_STATE_KEY, None)
+        return redirect("/?auth_error=github_auth_failed", code=302)
 
 
 @app.get("/api/site/apps")

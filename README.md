@@ -25,13 +25,28 @@ source .venv/bin/activate
 
 A aplicacao sobe em `http://localhost:5000`.
 
-## Protecao por senha
+## Autenticacao do portal
 
 O portal usa sessao Flask para liberar o menu principal.
 
+Opcao 1, senha simples:
+
 - Configure `PORTAL_PASSWORD` no `.env` ou no provedor de deploy
 - Configure `FLASK_SECRET_KEY` para persistir a sessao com seguranca
-- Se `PORTAL_PASSWORD` estiver vazio, o portal entra sem exigir login
+
+Opcao 2, entrar com GitHub via OAuth:
+
+- Crie um OAuth App no GitHub
+- Configure `GITHUB_OAUTH_CLIENT_ID`
+- Configure `GITHUB_OAUTH_CLIENT_SECRET`
+- Configure `GITHUB_OAUTH_CALLBACK_URL`
+- Opcionalmente configure `GITHUB_ALLOWED_USERS` com logins separados por virgula
+
+Exemplo de callback:
+
+- `https://SEU-DOMINIO/auth/github/callback`
+
+Se `PORTAL_PASSWORD` e as variaveis GitHub estiverem vazias, o portal entra sem exigir login.
 
 ## Integracao BPA
 

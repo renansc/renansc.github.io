@@ -35,6 +35,15 @@
         </div>
 
         <form class="auth-form" id="loginForm">
+          <div class="oauth-panel" id="oauthPanel">
+            <span class="oauth-label">Entrar com conta autorizada</span>
+            <a class="github-login" id="githubLoginButton" href="/auth/github/start">Entrar com GitHub</a>
+          </div>
+
+          <div class="auth-divider" id="authDivider">
+            <span>ou use a senha do portal</span>
+          </div>
+
           <label class="field">
             <span>Senha do portal</span>
             <input
@@ -47,7 +56,7 @@
             />
           </label>
 
-          <button class="primary-link auth-submit" type="submit">Entrar no portal</button>
+          <button class="primary-link auth-submit" id="passwordLoginButton" type="submit">Entrar no portal</button>
           <p class="auth-feedback" id="authFeedback" aria-live="polite"></p>
         </form>
       </div>
@@ -68,6 +77,7 @@
 
         <div class="topbar-actions">
           <div class="status-pill" id="portalSummary">0 atalhos liberados</div>
+          <div class="user-pill is-hidden" id="userPill"></div>
           <div class="session-actions">
             <nav aria-label="Menu principal">
               <ul class="menu" id="menuLinks"></ul>

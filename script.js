@@ -57,6 +57,33 @@ const loginForm = document.getElementById("loginForm");
 const passwordInput = document.getElementById("passwordInput");
 const authFeedback = document.getElementById("authFeedback");
 const logoutButton = document.getElementById("logoutButton");
+const githubLoginButton = document.getElementById("githubLoginButton");
+const oauthPanel = document.getElementById("oauthPanel");
+const authDivider = document.getElementById("authDivider");
+const passwordLoginButton = document.getElementById("passwordLoginButton");
+const userPill = document.getElementById("userPill");
+
+function authErrorMessage(code) {
+  const messages = {
+    github_access_denied: "O acesso com GitHub foi cancelado.",
+    github_invalid_state: "A autenticacao GitHub expirou. Tente novamente.",
+    github_missing_code: "O GitHub nao retornou o codigo de autorizacao.",
+    github_user_not_allowed: "Sua conta GitHub nao esta autorizada neste portal.",
+    github_auth_failed: "Nao foi possivel concluir o login com GitHub."
+  };
+  return messages[code] || "";
+}
+
+function readQueryError() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("auth_error") || "";
+}
+
+function clearQueryString() {
+  if (window.location.search) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
 
 function countLinks() {
   return portalApps.reduce((total, app) => total + 1 + (app.children?.length || 0), 0);
@@ -127,9 +154,40 @@ function refreshSummary() {
   }
 }
 
-function setAuthenticatedState(authenticated) {
+function updateAuthOptions(status) {
+  const providers = status?.providers || {};
+  const githubEnabled = Boolean(providers.github);
+  const passwordEnabled = Boolean(providers.password);
+
+  oauthPanel?.classList.toggle("is-hidden", !githubEnabled);
+  authDivider?.classList.toggle("is-hidden", !(githubEnabled && passwordEnabled));
+
+  if (passwordInput) {
+    passwordInput.disabled = !passwordEnabled;
+    passwordInput.parentElement?.classList.toggle("is-hidden", !passwordEnabled);
+  }
+
+  passwordLoginButton?.classList.toggle("is-hidden", !passwordEnabled);
+  githubLoginButton?.classList.toggle("is-hidden", !githubEnabled);
+}
+
+function setUserPill(user) {
+  if (!user || !user.login) {
+    userPill?.classList.add("is-hidden");
+    if (userPill) {
+      userPill.textContent = "";
+    }
+    return;
+  }
+
+  userPill?.classList.remove("is-hidden");
+  userPill.textContent = user.provider === "github" ? `GitHub: ${user.login}` : `Usuario: ${user.login}`;
+}
+
+function setAuthenticatedState(authenticated, user = null) {
   authScreen.classList.toggle("is-hidden", authenticated);
   portalShell.classList.toggle("is-hidden", !authenticated);
+  setUserPill(user);
 
   if (authenticated) {
     authFeedback.textContent = "";
@@ -144,7 +202,8 @@ async function loadAuthState() {
       headers: { Accept: "application/json" }
     });
     const payload = await response.json();
-    setAuthenticatedState(Boolean(payload.authenticated));
+    updateAuthOptions(payload);
+    setAuthenticatedState(Boolean(payload.authenticated), payload.user || null);
   } catch (error) {
     authFeedback.textContent = "Nao foi possivel validar o acesso agora.";
   }
@@ -188,7 +247,7 @@ loginForm?.addEventListener("submit", async (event) => {
 
   try {
     await login(password);
-    setAuthenticatedState(true);
+    setAuthenticatedState(true, { provider: "password", login: "local" });
   } catch (error) {
     authFeedback.textContent = error.message;
   }
@@ -201,4 +260,9 @@ logoutButton?.addEventListener("click", async () => {
 renderMenu();
 renderCards();
 refreshSummary();
+const queryError = readQueryError();
+if (queryError) {
+  authFeedback.textContent = authErrorMessage(queryError);
+  clearQueryString();
+}
 loadAuthState();
