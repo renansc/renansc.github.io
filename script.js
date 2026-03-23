@@ -69,7 +69,8 @@ function authErrorMessage(code) {
     github_invalid_state: "A autenticacao GitHub expirou. Tente novamente.",
     github_missing_code: "O GitHub nao retornou o codigo de autorizacao.",
     github_user_not_allowed: "Sua conta GitHub nao esta autorizada neste portal.",
-    github_auth_failed: "Nao foi possivel concluir o login com GitHub."
+    github_auth_failed: "Nao foi possivel concluir o login com GitHub.",
+    github_not_configured: "O login com GitHub ainda nao foi configurado neste servidor."
   };
   return messages[code] || "";
 }

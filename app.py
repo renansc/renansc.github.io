@@ -2402,7 +2402,7 @@ def auth_logout():
 @app.get("/auth/github/start")
 def github_auth_start():
     if not github_oauth_enabled():
-        abort(404)
+        return redirect("/?auth_error=github_not_configured", code=302)
 
     state = secrets.token_urlsafe(24)
     session[GITHUB_OAUTH_STATE_KEY] = state
@@ -2420,7 +2420,7 @@ def github_auth_start():
 @app.get("/auth/github/callback")
 def github_auth_callback():
     if not github_oauth_enabled():
-        abort(404)
+        return redirect("/?auth_error=github_not_configured", code=302)
 
     error = str(request.args.get("error", "")).strip()
     if error:
