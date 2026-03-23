@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import smtplib
 import unicodedata
 import urllib.error
@@ -19,7 +21,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 from finance_research import DEFAULT_ALLOWED_DOMAINS, DEFAULT_USER_AGENT, ScraperError, build_scraper_diagnostic, run_scraper_purchase_research
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_from_directory, session
 from sqlalchemy import Boolean, Float, Integer, String, Text, create_engine, delete, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
@@ -76,6 +78,9 @@ try:
     BPA_API_TIMEOUT_SECONDS = max(5, int(str(os.getenv("BPA_API_TIMEOUT_SECONDS", "20")).strip()))
 except ValueError:
     BPA_API_TIMEOUT_SECONDS = 20
+
+PORTAL_PASSWORD = str(os.getenv("PORTAL_PASSWORD", "")).strip()
+PORTAL_SESSION_KEY = "portal_authenticated"
 
 
 class AppError(Exception):
@@ -2251,6 +2256,7 @@ initialize_data()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY") or os.getenv("SECRET_KEY") or secrets.token_hex(32)
 
 max_body_size = parse_size(os.getenv("MAX_BODY_SIZE", "25mb"))
 if max_body_size is not None:
@@ -2306,6 +2312,49 @@ def healthcheck():
             "timestamp": now_iso(),
         }
     )
+
+
+def portal_auth_enabled() -> bool:
+    return bool(PORTAL_PASSWORD)
+
+
+def portal_is_authenticated() -> bool:
+    if not portal_auth_enabled():
+        return True
+    return bool(session.get(PORTAL_SESSION_KEY))
+
+
+@app.get("/api/auth/status")
+def auth_status():
+    return jsonify(
+        {
+            "enabled": portal_auth_enabled(),
+            "authenticated": portal_is_authenticated(),
+        }
+    )
+
+
+@app.post("/api/auth/login")
+def auth_login():
+    body = request.get_json(silent=True) or {}
+    password = str(body.get("password", ""))
+
+    if not portal_auth_enabled():
+        session[PORTAL_SESSION_KEY] = True
+        return jsonify({"ok": True, "authenticated": True, "enabled": False})
+
+    if not hmac.compare_digest(password, PORTAL_PASSWORD):
+        session.pop(PORTAL_SESSION_KEY, None)
+        return jsonify({"error": "Senha invalida."}), 401
+
+    session[PORTAL_SESSION_KEY] = True
+    return jsonify({"ok": True, "authenticated": True, "enabled": True})
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    session.pop(PORTAL_SESSION_KEY, None)
+    return jsonify({"ok": True, "authenticated": False})
 
 
 @app.get("/api/site/apps")

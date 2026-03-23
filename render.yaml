@@ -7,6 +7,10 @@ services:
     startCommand: gunicorn app:app
     healthCheckPath: /api/health
     envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: PORTAL_PASSWORD
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DB_SSL

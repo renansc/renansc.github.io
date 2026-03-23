@@ -1,11 +1,10 @@
 # Portal Renan SC
 
-Portal com dois aplicativos estaticos e um portal principal servidos por um backend Python com Flask, sem dependencia de Node:
+Portal com um menu principal protegido por senha, servido por backend Python com Flask, sem dependencia de Node:
 
-- `FinanceiroNanotech`
-- `GPSMusical`
 - `Site` (home do portal)
-- `ProntuarioBPA` (gerenciador visual com proxy para o servico Firebird/BPA)
+- links externos para `CardioClin`, `Rio Branco`, `Nanotech` e `Laboratorio Santa Terezinha`
+- submenu da `Nanotech` para `Financeiro` e `GPS Musical`
 
 O frontend continua usando `localStorage` como cache, mas a persistencia principal fica no backend via `/api/stores/:storeId`.
 
@@ -26,14 +25,20 @@ source .venv/bin/activate
 
 A aplicacao sobe em `http://localhost:5000`.
 
-## Modulo BPA
+## Protecao por senha
 
-O portal agora inclui a pagina `ProntuarioBPA/prontuario.html`, com atalho amigavel em `prontuario-bpa.html`.
+O portal usa sessao Flask para liberar o menu principal.
 
-- O frontend conversa com o proprio backend do portal em `/api/bpa/...`
-- Esse backend faz proxy para o servico BPA externo, por padrao em `http://127.0.0.1:5002`
-- Ajuste `BPA_API_BASE_URL` no `.env` se o servico Firebird estiver em outro host/porta
-- O servico BPA esperado e o app Flask do projeto `integarapi`
+- Configure `PORTAL_PASSWORD` no `.env` ou no provedor de deploy
+- Configure `FLASK_SECRET_KEY` para persistir a sessao com seguranca
+- Se `PORTAL_PASSWORD` estiver vazio, o portal entra sem exigir login
+
+## Integracao BPA
+
+O backend do portal continua expondo `/api/bpa/...` como proxy para o servico Firebird/BPA.
+
+- Ajuste `BPA_API_BASE_URL` no `.env` se o servico estiver em outro host/porta
+- O servico BPA esperado agora pode ser mantido separado do site, em `api-firebird`
 
 ## Configuracao do banco
 
@@ -60,7 +65,7 @@ Exemplos de `DATABASE_URL`:
 
 ## Persistencia
 
-Os dados nao ficam mais em um `payload` generico. O backend grava em tabelas dedicadas:
+Os dados operacionais continuam usando tabelas dedicadas no backend:
 
 - `site_apps`
 - `gps_songs`
