@@ -76,10 +76,19 @@ const loginForm = document.getElementById("loginForm");
 const passwordInput = document.getElementById("passwordInput");
 const authFeedback = document.getElementById("authFeedback");
 const logoutButton = document.getElementById("logoutButton");
+const activeAppsGrid = document.getElementById("activeAppsGrid");
+const pendingAppsGrid = document.getElementById("pendingAppsGrid");
+const pendingCount = document.getElementById("pendingCount");
+const viewTabs = Array.from(document.querySelectorAll("[data-view-target]"));
+const portalViews = Array.from(document.querySelectorAll(".portal-view"));
 let memoryAuthenticated = false;
 
 function countLinks() {
   return portalApps.filter((app) => app.href).length;
+}
+
+function countPending() {
+  return portalApps.filter((app) => !app.href).length;
 }
 
 function isAuthenticated() {
@@ -119,9 +128,10 @@ function renderMenu() {
     .join("");
 }
 
-function renderCards() {
-  const grid = document.getElementById("appsGrid");
-  grid.innerHTML = portalApps
+function renderAppCards(items, target) {
+  if (!target) return;
+
+  target.innerHTML = items
     .map((app) => {
       const action = app.href
         ? `<a class="app-link" href="${app.href}" target="_blank" rel="noreferrer">Abrir sistema</a>`
@@ -148,8 +158,20 @@ function renderCards() {
     .join("");
 }
 
+function renderCards() {
+  renderAppCards(
+    portalApps.filter((app) => app.href),
+    activeAppsGrid
+  );
+  renderAppCards(
+    portalApps.filter((app) => !app.href),
+    pendingAppsGrid
+  );
+}
+
 function refreshSummary() {
   const activeCount = countLinks();
+  const waitingCount = countPending();
   const countElement = document.getElementById("appCount");
   const summary = document.getElementById("portalSummary");
 
@@ -157,9 +179,25 @@ function refreshSummary() {
     countElement.textContent = String(activeCount);
   }
 
-  if (summary) {
-    summary.textContent = `${activeCount} links ativos`;
+  if (pendingCount) {
+    pendingCount.textContent = String(waitingCount);
   }
+
+  if (summary) {
+    summary.textContent = `${activeCount} ativos / ${waitingCount} pendentes`;
+  }
+}
+
+function activateView(targetId) {
+  portalViews.forEach((view) => {
+    const active = view.id === targetId;
+    view.classList.toggle("is-hidden", !active);
+    view.hidden = !active;
+  });
+
+  viewTabs.forEach((tab) => {
+    tab.classList.toggle("is-active", tab.dataset.viewTarget === targetId);
+  });
 }
 
 loginForm?.addEventListener("submit", (event) => {
@@ -186,7 +224,14 @@ logoutButton?.addEventListener("click", () => {
   setAuthenticatedState(false);
 });
 
+viewTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    activateView(tab.dataset.viewTarget);
+  });
+});
+
 renderMenu();
 renderCards();
 refreshSummary();
+activateView("overviewView");
 setAuthenticatedState(isAuthenticated());

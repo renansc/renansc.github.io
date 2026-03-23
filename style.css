@@ -329,6 +329,41 @@ button {
   padding: 34px 0 48px;
 }
 
+.view-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.view-tab {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.view-tab:hover,
+.view-tab:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+
+.view-tab.is-active {
+  color: #061120;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent), #c4f6ff);
+  box-shadow: 0 10px 30px rgba(103, 232, 249, 0.25);
+}
+
+.portal-view {
+  display: block;
+}
+
 .card {
   position: relative;
   overflow: hidden;
@@ -354,6 +389,10 @@ button {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   gap: 18px;
   align-items: stretch;
+}
+
+.hero-compact {
+  margin-top: 0;
 }
 
 .hero-copy,
@@ -717,7 +756,8 @@ button {
 
   .menu,
   .submenu-links,
-  .session-actions {
+  .session-actions,
+  .view-switcher {
     width: 100%;
   }
 
@@ -731,6 +771,10 @@ button {
   .auth-submit {
     width: 100%;
     justify-content: center;
+  }
+
+  .view-tab {
+    width: 100%;
   }
 
   .app-foot {

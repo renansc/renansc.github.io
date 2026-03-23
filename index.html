@@ -79,74 +79,85 @@
       </header>
 
       <main class="container">
-        <section class="hero">
-          <article class="hero-copy card reveal">
-            <span class="eyebrow">Painel principal</span>
-            <h2>Um portal unico para abrir os sistemas disponiveis com senha antes do acesso.</h2>
-            <p>
-              O portal ficou leve e simples para demonstracao no GitHub Pages, mantendo os atalhos dos sistemas em
-              producao e destacando os ambientes que ainda aguardam definicao de URL.
-            </p>
-
-            <div class="hero-actions">
-              <a class="primary-link" href="#apps">Abrir menu</a>
-              <a class="ghost-link" href="https://renansc.github.io/" target="_blank" rel="noreferrer">Site Nanotech</a>
-            </div>
-
-            <dl class="hero-stats">
-              <div>
-                <dt id="appCount">0</dt>
-                <dd>atalhos publicados</dd>
-              </div>
-              <div>
-                <dt>1</dt>
-                <dd>portal com senha</dd>
-              </div>
-              <div>
-                <dt>100%</dt>
-                <dd>apps destacados fora do site</dd>
-              </div>
-            </dl>
-          </article>
-
-          <aside class="hero-panel card reveal">
-            <div class="panel-head">
-              <span class="eyebrow">Organizacao</span>
-              <div class="panel-badge">Portal + apps separados</div>
-            </div>
-
-            <div class="signal-grid">
-              <article>
-                <strong>Acesso simples</strong>
-                <p>Senha local no navegador para demonstracao rapida, sem depender de backend de autenticacao.</p>
-              </article>
-              <article>
-                <strong>Links organizados</strong>
-                <p>Os apps do Render e o site do GitHub ficam no mesmo painel para consulta imediata.</p>
-              </article>
-              <article>
-                <strong>Status visivel</strong>
-                <p>Quando um app ainda nao tiver URL definida, o portal mostra isso sem esconder a entrada.</p>
-              </article>
-            </div>
-
-            <div class="hero-orbs" aria-hidden="true">
-              <span class="orb orb-a"></span>
-              <span class="orb orb-b"></span>
-              <span class="orb orb-c"></span>
-            </div>
-          </aside>
+        <section class="view-switcher card reveal" aria-label="Views do portal">
+          <button class="view-tab is-active" data-view-target="overviewView" type="button">Visao geral</button>
+          <button class="view-tab" data-view-target="activeAppsView" type="button">Apps ativos</button>
+          <button class="view-tab" data-view-target="pendingAppsView" type="button">Pendencias</button>
         </section>
 
-        <section class="section-header reveal" id="apps">
-          <div>
-            <span class="eyebrow">Aplicativos disponiveis</span>
-            <h3>Escolha o ambiente que deseja abrir</h3>
-          </div>
-          <p>Os atalhos abaixo seguem o arquivo de acessos e mostram quais sistemas ja tem URL publicada.</p>
+        <section class="portal-view reveal" id="overviewView">
+          <section class="hero hero-compact">
+            <article class="hero-copy card">
+              <span class="eyebrow">Painel principal</span>
+              <h2>Um portal central com views separadas para navegar sem rolagem excessiva.</h2>
+              <p>
+                Depois do login, o portal mostra secoes internas para visao geral, apps ativos e pendencias, deixando
+                a consulta mais rapida e organizada.
+              </p>
+
+              <dl class="hero-stats">
+                <div>
+                  <dt id="appCount">0</dt>
+                  <dd>links ativos</dd>
+                </div>
+                <div>
+                  <dt id="pendingCount">0</dt>
+                  <dd>pendencias visiveis</dd>
+                </div>
+                <div>
+                  <dt>1</dt>
+                  <dd>portal de demonstracao</dd>
+                </div>
+              </dl>
+            </article>
+
+            <aside class="hero-panel card">
+              <div class="panel-head">
+                <span class="eyebrow">Resumo rapido</span>
+                <div class="panel-badge">Login + views</div>
+              </div>
+
+              <div class="signal-grid">
+                <article>
+                  <strong>Visao geral</strong>
+                  <p>Resumo do portal e indicadores do ambiente de demonstracao.</p>
+                </article>
+                <article>
+                  <strong>Apps ativos</strong>
+                  <p>Lista somente os sistemas que ja possuem URL pronta para abrir.</p>
+                </article>
+                <article>
+                  <strong>Pendencias</strong>
+                  <p>Mostra os sistemas cadastrados que ainda precisam de link final.</p>
+                </article>
+              </div>
+            </aside>
+          </section>
         </section>
 
-        <section class="apps-grid" id="appsGrid" aria-label="Lista de aplicativos"></section>
+        <section class="portal-view is-hidden" id="activeAppsView">
+          <section class="section-header">
+            <div>
+              <span class="eyebrow">Apps ativos</span>
+              <h3>Sistemas publicados</h3>
+            </div>
+            <p>Somente os acessos que ja podem ser abertos imediatamente.</p>
+          </section>
+
+          <section class="apps-grid" id="activeAppsGrid" aria-label="Lista de aplicativos ativos"></section>
+        </section>
+
+        <section class="portal-view is-hidden" id="pendingAppsView">
+          <section class="section-header">
+            <div>
+              <span class="eyebrow">Pendencias</span>
+              <h3>Sistemas aguardando URL</h3>
+            </div>
+            <p>Entradas cadastradas no portal que ainda nao possuem link final informado.</p>
+          </section>
+
+          <section class="apps-grid" id="pendingAppsGrid" aria-label="Lista de aplicativos pendentes"></section>
+        </section>
       </main>
     </div>
   </div>
