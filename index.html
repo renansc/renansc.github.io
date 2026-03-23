@@ -6,7 +6,7 @@
   <title>Portal de Sistemas | Renan SC</title>
   <meta
     name="description"
-    content="Portal protegido por senha para abrir os ambientes CardioClin, Rio Branco, Nanotech e Laboratorio Santa Terezinha."
+    content="Portal simples com senha de demonstracao para abrir os apps publicados no Render."
   />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -24,28 +24,19 @@
           <span class="eyebrow">Acesso protegido</span>
           <h1>Portal operacional central</h1>
           <p>
-            Entre com a senha para liberar os atalhos dos ambientes de producao e acessar o menu unificado de sistemas.
+            Entre com uma senha simples de demonstracao para liberar o menu central e abrir os apps publicados.
           </p>
           <ul class="auth-list">
-            <li>CardioClin</li>
-            <li>Rio Branco</li>
-            <li>Nanotech com submenu dedicado</li>
-            <li>Laboratorio Santa Terezinha</li>
+            <li>RIS+PACS - Laboratorio Santa Terezinha</li>
+            <li>RIS+CLN - Cardio Clin</li>
+            <li>FULL - Nanotech</li>
+            <li>Site - Nanotech no GitHub</li>
           </ul>
         </div>
 
         <form class="auth-form" id="loginForm">
-          <div class="oauth-panel is-hidden" id="oauthPanel">
-            <span class="oauth-label">Entrar com conta autorizada</span>
-            <a class="github-login" id="githubLoginButton" href="/auth/github/start">Entrar com GitHub</a>
-          </div>
-
-          <div class="auth-divider is-hidden" id="authDivider">
-            <span>ou use a senha do portal</span>
-          </div>
-
           <label class="field">
-            <span>Senha do portal</span>
+            <span>Senha de demonstracao</span>
             <input
               id="passwordInput"
               name="password"
@@ -57,6 +48,7 @@
           </label>
 
           <button class="primary-link auth-submit" id="passwordLoginButton" type="submit">Entrar no portal</button>
+          <p class="auth-hint">A autenticacao e local no navegador, apenas para demonstracao.</p>
           <p class="auth-feedback" id="authFeedback" aria-live="polite"></p>
         </form>
       </div>
@@ -71,13 +63,12 @@
           <div class="brand-copy">
             <span class="eyebrow">Portal de sistemas</span>
             <h1>Renan SC</h1>
-            <p>Menu central para abrir rapidamente os sistemas separados do site principal.</p>
+            <p>Menu central para abrir rapidamente os sistemas hospedados no Render e no GitHub Pages.</p>
           </div>
         </div>
 
         <div class="topbar-actions">
           <div class="status-pill" id="portalSummary">0 atalhos liberados</div>
-          <div class="user-pill is-hidden" id="userPill"></div>
           <div class="session-actions">
             <nav aria-label="Menu principal">
               <ul class="menu" id="menuLinks"></ul>
@@ -93,13 +84,13 @@
             <span class="eyebrow">Painel principal</span>
             <h2>Um portal unico para abrir os sistemas disponiveis com senha antes do acesso.</h2>
             <p>
-              O site agora funciona como hub central. Os apps foram destacados como ambientes independentes, com a
-              Nanotech trazendo um submenu proprio para os modulos operacionais.
+              O portal ficou leve e simples para demonstracao no GitHub Pages, mantendo os atalhos dos sistemas em
+              producao e destacando os ambientes que ainda aguardam definicao de URL.
             </p>
 
             <div class="hero-actions">
               <a class="primary-link" href="#apps">Abrir menu</a>
-              <a class="ghost-link" href="https://nanotech-lvoz.onrender.com/" target="_blank" rel="noreferrer">Nanotech</a>
+              <a class="ghost-link" href="https://renansc.github.io/" target="_blank" rel="noreferrer">Site Nanotech</a>
             </div>
 
             <dl class="hero-stats">
@@ -126,16 +117,16 @@
 
             <div class="signal-grid">
               <article>
-                <strong>Login inicial</strong>
-                <p>O acesso ao portal depende de autenticacao por senha e pode ser controlado por variavel de ambiente.</p>
+                <strong>Acesso simples</strong>
+                <p>Senha local no navegador para demonstracao rapida, sem depender de backend de autenticacao.</p>
               </article>
               <article>
-                <strong>Nanotech em submenu</strong>
-                <p>Financeiro e GPS Musical ficam agrupados sob a mesma area operacional.</p>
+                <strong>Links organizados</strong>
+                <p>Os apps do Render e o site do GitHub ficam no mesmo painel para consulta imediata.</p>
               </article>
               <article>
-                <strong>Links externos</strong>
-                <p>CardioClin, Rio Branco e Santa Terezinha abrem diretamente nos respectivos ambientes.</p>
+                <strong>Status visivel</strong>
+                <p>Quando um app ainda nao tiver URL definida, o portal mostra isso sem esconder a entrada.</p>
               </article>
             </div>
 
@@ -152,7 +143,7 @@
             <span class="eyebrow">Aplicativos disponiveis</span>
             <h3>Escolha o ambiente que deseja abrir</h3>
           </div>
-          <p>Os atalhos abaixo foram organizados por sistema, com submenu visivel quando houver modulos internos.</p>
+          <p>Os atalhos abaixo seguem o arquivo de acessos e mostram quais sistemas ja tem URL publicada.</p>
         </section>
 
         <section class="apps-grid" id="appsGrid" aria-label="Lista de aplicativos"></section>
