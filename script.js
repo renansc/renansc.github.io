@@ -1,105 +1,57 @@
 const DEMO_PASSWORD = "Luis@2024";
 const DEMO_AUTH_KEY = "portal-demo-authenticated";
+const MENU_APPS_FILE = "menuapps.txt";
 const FULL_BASE_URL = "https://nanotech-lvoz.onrender.com";
 
-const portalApps = [
+const fallbackApps = [
   {
-    slug: "rispacs",
+    slug: "ris-pacs",
     tipo: "direto",
     nome: "RIS+PACS",
-    empresa: "Laboratorio Santa Terezinha",
-    descricao: "Link direto configurado acima de [menuapps].",
-    href: "https://rispacsfull.onrender.com/",
-    accent: "cyan",
-    icon: "L",
-    kicker: "Direto",
-    meta: "URL externa"
+    empresa: "LAB.STA TEREZINHA",
+    href: "https://rispacsfull.onrender.com/"
   },
   {
-    slug: "cardioclin",
+    slug: "ris-cln",
     tipo: "direto",
     nome: "RIS+CLN",
-    empresa: "Cardio Clin",
-    descricao: "Link direto configurado acima de [menuapps].",
-    href: "https://cardioclin.onrender.com/",
-    accent: "blue",
-    icon: "C",
-    kicker: "Direto",
-    meta: "URL externa"
+    empresa: "CARDIO CLIN",
+    href: "https://cardioclin.onrender.com/"
   },
   {
-    slug: "riobranco",
+    slug: "crm-voip-cam",
     tipo: "direto",
     nome: "CRM+VOIP+CAM",
-    empresa: "Rio Branco",
-    descricao: "Link direto configurado acima de [menuapps].",
-    href: "https://206.62.65.68:80",
-    accent: "gold",
-    icon: "R",
-    kicker: "Direto",
-    meta: "URL externa"
+    empresa: "RIO BRANCO",
+    href: "https://206.62.65.68:80"
   },
   {
-    slug: "bpa",
+    slug: "ris-bpa",
     tipo: "full",
     nome: "RIS+BPA",
-    empresa: "api-firebird",
-    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
-    route: "bpa",
-    accent: "cyan",
-    icon: "B",
-    kicker: "FULL",
-    meta: "/bpa"
+    empresa: "srv/api-firebird",
+    href: "https://nanotech-lvoz.onrender.com/bpa"
   },
   {
     slug: "financeiro",
     tipo: "full",
-    nome: "Financeiro",
-    empresa: "Nanotech",
-    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
-    route: "financeiro",
-    accent: "gold",
-    icon: "F",
-    kicker: "FULL",
-    meta: "/financeiro"
+    nome: "financeiro",
+    empresa: "srv/financeiro",
+    href: "https://nanotech-lvoz.onrender.com/financeiro"
   },
   {
     slug: "gpsmusical",
     tipo: "full",
-    nome: "GPS Musical",
-    empresa: "Nanotech",
-    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
-    route: "gpsmusical",
-    accent: "blue",
-    icon: "G",
-    kicker: "FULL",
-    meta: "/gpsmusical"
-  },
-  {
-    slug: "site-nanotech",
-    tipo: "direto",
-    nome: "Site",
-    empresa: "Nanotech",
-    descricao: "Site institucional no GitHub Pages, acima de [menuapps].",
-    href: "https://renansc.github.io/",
-    accent: "blue",
-    icon: "S",
-    kicker: "Direto",
-    meta: "GitHub Pages"
-  },
-  {
-    slug: "full-nanotech",
-    tipo: "direto",
-    nome: "FULL",
-    empresa: "Nanotech",
-    descricao: "Entrada principal da FULL, acima de [menuapps].",
-    href: FULL_BASE_URL,
-    accent: "gold",
-    icon: "N",
-    kicker: "Direto",
-    meta: "URL base"
+    nome: "gpsmusical",
+    empresa: "srv/gpsmusical",
+    href: "https://nanotech-lvoz.onrender.com/gpsmusical"
   }
 ];
+
+const accentByType = {
+  direto: ["cyan", "blue", "gold"],
+  full: ["gold", "cyan", "blue"]
+};
 
 const authScreen = document.getElementById("authScreen");
 const portalShell = document.getElementById("portalShell");
@@ -112,13 +64,105 @@ const fullAppsGrid = document.getElementById("fullAppsGrid");
 const fullCount = document.getElementById("fullCount");
 const viewTabs = Array.from(document.querySelectorAll("[data-view-target]"));
 const portalViews = Array.from(document.querySelectorAll(".portal-view"));
-let memoryAuthenticated = false;
 
-function resolveHref(app) {
+let memoryAuthenticated = false;
+let portalApps = [...fallbackApps];
+
+function slugify(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function detectType(section) {
+  return section === "menuapps" ? "full" : "direto";
+}
+
+function deriveMeta(app) {
   if (app.tipo === "full") {
-    return `${FULL_BASE_URL}/${String(app.route || "").replace(/^\/+/, "")}`;
+    try {
+      const path = new URL(app.href).pathname || "/";
+      return path === "/" ? "FULL" : path;
+    } catch (error) {
+      return "FULL";
+    }
   }
-  return app.href || "";
+  return "URL externa";
+}
+
+function deriveDescription(app) {
+  return app.tipo === "full"
+    ? "Aplicacao interna da FULL aberta por rota dedicada."
+    : "Link direto configurado acima de [menuapps].";
+}
+
+function enrichApps(items) {
+  return items.map((app, index) => {
+    const colors = accentByType[app.tipo] || accentByType.direto;
+    return {
+      ...app,
+      slug: app.slug || slugify(app.nome),
+      accent: colors[index % colors.length],
+      icon: String(app.nome || "?").trim().charAt(0).toUpperCase() || "?",
+      kicker: app.tipo === "full" ? "FULL" : "Direto",
+      meta: deriveMeta(app),
+      descricao: deriveDescription(app)
+    };
+  });
+}
+
+function parseMenuApps(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  let section = "direto";
+  const items = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith("APP")) continue;
+    if (line === "[menuapps]") {
+      section = "menuapps";
+      continue;
+    }
+
+    const columns = rawLine.split(/\t+/).map((item) => item.trim()).filter(Boolean);
+    if (columns.length < 2) continue;
+
+    const nome = columns[0];
+    const empresa = columns[1] || "";
+    const href = columns[columns.length - 1] || "";
+    if (!href.startsWith("http")) continue;
+
+    items.push({
+      slug: slugify(nome),
+      tipo: detectType(section),
+      nome,
+      empresa,
+      href
+    });
+  }
+
+  return enrichApps(items);
+}
+
+async function loadPortalApps() {
+  try {
+    const response = await fetch(MENU_APPS_FILE, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Falha ao carregar ${MENU_APPS_FILE}`);
+    }
+
+    const text = await response.text();
+    const parsed = parseMenuApps(text);
+    if (parsed.length) {
+      portalApps = parsed;
+    }
+  } catch (error) {
+    portalApps = enrichApps(fallbackApps);
+  }
 }
 
 function directApps() {
@@ -130,7 +174,7 @@ function fullApps() {
 }
 
 function countLinks() {
-  return portalApps.filter((app) => Boolean(resolveHref(app))).length;
+  return portalApps.length;
 }
 
 function isAuthenticated() {
@@ -165,7 +209,7 @@ function setAuthenticatedState(authenticated) {
 function renderMenu() {
   const menu = document.getElementById("menuLinks");
   menu.innerHTML = portalApps
-    .map((app) => `<li><a href="${resolveHref(app)}" target="_blank" rel="noreferrer">${app.nome}</a></li>`)
+    .map((app) => `<li><a href="${app.href}" target="_blank" rel="noreferrer">${app.nome}</a></li>`)
     .join("");
 }
 
@@ -174,7 +218,6 @@ function renderAppCards(items, target) {
 
   target.innerHTML = items
     .map((app) => {
-      const href = resolveHref(app);
       return `
         <article class="app-card card reveal" data-accent="${app.accent}">
           <div>
@@ -188,7 +231,7 @@ function renderAppCards(items, target) {
           </div>
           <div class="app-foot">
             <span class="app-meta">${app.meta}</span>
-            <a class="app-link" href="${href}" target="_blank" rel="noreferrer">Abrir sistema</a>
+            <a class="app-link" href="${app.href}" target="_blank" rel="noreferrer">Abrir sistema</a>
           </div>
         </article>
       `;
@@ -262,8 +305,13 @@ viewTabs.forEach((tab) => {
   });
 });
 
-renderMenu();
-renderCards();
-refreshSummary();
-activateView("overviewView");
-setAuthenticatedState(isAuthenticated());
+async function bootstrap() {
+  await loadPortalApps();
+  renderMenu();
+  renderCards();
+  refreshSummary();
+  activateView("overviewView");
+  setAuthenticatedState(isAuthenticated());
+}
+
+bootstrap();
