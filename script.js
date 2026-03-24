@@ -1,72 +1,103 @@
 const DEMO_PASSWORD = "Luis@2024";
 const DEMO_AUTH_KEY = "portal-demo-authenticated";
+const FULL_BASE_URL = "https://nanotech-lvoz.onrender.com";
 
 const portalApps = [
   {
     slug: "rispacs",
+    tipo: "direto",
     nome: "RIS+PACS",
     empresa: "Laboratorio Santa Terezinha",
-    descricao: "Ambiente principal do laboratorio publicado no Render.",
+    descricao: "Link direto configurado acima de [menuapps].",
     href: "https://rispacsfull.onrender.com/",
     accent: "cyan",
     icon: "L",
-    kicker: "Laboratorio",
-    meta: "Render"
+    kicker: "Direto",
+    meta: "URL externa"
   },
   {
     slug: "cardioclin",
+    tipo: "direto",
     nome: "RIS+CLN",
     empresa: "Cardio Clin",
-    descricao: "Acesso ao ambiente clinico da Cardio Clin.",
+    descricao: "Link direto configurado acima de [menuapps].",
     href: "https://cardioclin.onrender.com/",
     accent: "blue",
     icon: "C",
-    kicker: "Clinica",
-    meta: "Render"
+    kicker: "Direto",
+    meta: "URL externa"
   },
   {
     slug: "riobranco",
+    tipo: "direto",
     nome: "CRM+VOIP+CAM",
     empresa: "Rio Branco",
-    descricao: "Entrada cadastrada no menu, aguardando URL final para publicacao.",
-    href: "",
+    descricao: "Link direto configurado acima de [menuapps].",
+    href: "https://206.62.65.68:80",
     accent: "gold",
     icon: "R",
-    kicker: "Hospital",
-    meta: "Sem URL"
+    kicker: "Direto",
+    meta: "URL externa"
   },
   {
-    slug: "apae",
+    slug: "bpa",
+    tipo: "full",
     nome: "RIS+BPA",
-    empresa: "APAE",
-    descricao: "Entrada prevista no portal, aguardando publicacao do link.",
-    href: "",
+    empresa: "api-firebird",
+    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
+    route: "bpa",
     accent: "cyan",
-    icon: "A",
-    kicker: "Atendimento",
-    meta: "Sem URL"
+    icon: "B",
+    kicker: "FULL",
+    meta: "/bpa"
+  },
+  {
+    slug: "financeiro",
+    tipo: "full",
+    nome: "Financeiro",
+    empresa: "Nanotech",
+    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
+    route: "financeiro",
+    accent: "gold",
+    icon: "F",
+    kicker: "FULL",
+    meta: "/financeiro"
+  },
+  {
+    slug: "gpsmusical",
+    tipo: "full",
+    nome: "GPS Musical",
+    empresa: "Nanotech",
+    descricao: "Aplicacao interna da FULL aberta por rota dedicada.",
+    route: "gpsmusical",
+    accent: "blue",
+    icon: "G",
+    kicker: "FULL",
+    meta: "/gpsmusical"
   },
   {
     slug: "site-nanotech",
+    tipo: "direto",
     nome: "Site",
     empresa: "Nanotech",
-    descricao: "Site institucional publicado no GitHub Pages.",
+    descricao: "Site institucional no GitHub Pages, acima de [menuapps].",
     href: "https://renansc.github.io/",
     accent: "blue",
     icon: "S",
-    kicker: "GitHub",
+    kicker: "Direto",
     meta: "GitHub Pages"
   },
   {
     slug: "full-nanotech",
+    tipo: "direto",
     nome: "FULL",
     empresa: "Nanotech",
-    descricao: "Portal completo da Nanotech publicado no Render.",
-    href: "https://nanotech-lvoz.onrender.com/",
+    descricao: "Entrada principal da FULL, acima de [menuapps].",
+    href: FULL_BASE_URL,
     accent: "gold",
     icon: "N",
-    kicker: "Operacao",
-    meta: "Render"
+    kicker: "Direto",
+    meta: "URL base"
   }
 ];
 
@@ -76,19 +107,30 @@ const loginForm = document.getElementById("loginForm");
 const passwordInput = document.getElementById("passwordInput");
 const authFeedback = document.getElementById("authFeedback");
 const logoutButton = document.getElementById("logoutButton");
-const activeAppsGrid = document.getElementById("activeAppsGrid");
-const pendingAppsGrid = document.getElementById("pendingAppsGrid");
-const pendingCount = document.getElementById("pendingCount");
+const directAppsGrid = document.getElementById("directAppsGrid");
+const fullAppsGrid = document.getElementById("fullAppsGrid");
+const fullCount = document.getElementById("fullCount");
 const viewTabs = Array.from(document.querySelectorAll("[data-view-target]"));
 const portalViews = Array.from(document.querySelectorAll(".portal-view"));
 let memoryAuthenticated = false;
 
-function countLinks() {
-  return portalApps.filter((app) => app.href).length;
+function resolveHref(app) {
+  if (app.tipo === "full") {
+    return `${FULL_BASE_URL}/${String(app.route || "").replace(/^\/+/, "")}`;
+  }
+  return app.href || "";
 }
 
-function countPending() {
-  return portalApps.filter((app) => !app.href).length;
+function directApps() {
+  return portalApps.filter((app) => app.tipo === "direto");
+}
+
+function fullApps() {
+  return portalApps.filter((app) => app.tipo === "full");
+}
+
+function countLinks() {
+  return portalApps.filter((app) => Boolean(resolveHref(app))).length;
 }
 
 function isAuthenticated() {
@@ -123,8 +165,7 @@ function setAuthenticatedState(authenticated) {
 function renderMenu() {
   const menu = document.getElementById("menuLinks");
   menu.innerHTML = portalApps
-    .filter((app) => app.href)
-    .map((app) => `<li><a href="${app.href}" target="_blank" rel="noreferrer">${app.nome}</a></li>`)
+    .map((app) => `<li><a href="${resolveHref(app)}" target="_blank" rel="noreferrer">${app.nome}</a></li>`)
     .join("");
 }
 
@@ -133,10 +174,7 @@ function renderAppCards(items, target) {
 
   target.innerHTML = items
     .map((app) => {
-      const action = app.href
-        ? `<a class="app-link" href="${app.href}" target="_blank" rel="noreferrer">Abrir sistema</a>`
-        : `<span class="app-link app-link-disabled">Em configuracao</span>`;
-
+      const href = resolveHref(app);
       return `
         <article class="app-card card reveal" data-accent="${app.accent}">
           <div>
@@ -150,7 +188,7 @@ function renderAppCards(items, target) {
           </div>
           <div class="app-foot">
             <span class="app-meta">${app.meta}</span>
-            ${action}
+            <a class="app-link" href="${href}" target="_blank" rel="noreferrer">Abrir sistema</a>
           </div>
         </article>
       `;
@@ -159,19 +197,13 @@ function renderAppCards(items, target) {
 }
 
 function renderCards() {
-  renderAppCards(
-    portalApps.filter((app) => app.href),
-    activeAppsGrid
-  );
-  renderAppCards(
-    portalApps.filter((app) => !app.href),
-    pendingAppsGrid
-  );
+  renderAppCards(directApps(), directAppsGrid);
+  renderAppCards(fullApps(), fullAppsGrid);
 }
 
 function refreshSummary() {
   const activeCount = countLinks();
-  const waitingCount = countPending();
+  const fullAppsCount = fullApps().length;
   const countElement = document.getElementById("appCount");
   const summary = document.getElementById("portalSummary");
 
@@ -179,12 +211,12 @@ function refreshSummary() {
     countElement.textContent = String(activeCount);
   }
 
-  if (pendingCount) {
-    pendingCount.textContent = String(waitingCount);
+  if (fullCount) {
+    fullCount.textContent = String(fullAppsCount);
   }
 
   if (summary) {
-    summary.textContent = `${activeCount} ativos / ${waitingCount} pendentes`;
+    summary.textContent = `${activeCount} links / ${fullAppsCount} rotas full`;
   }
 }
 

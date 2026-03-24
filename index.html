@@ -81,8 +81,8 @@
       <main class="container">
         <section class="view-switcher card reveal" aria-label="Views do portal">
           <button class="view-tab is-active" data-view-target="overviewView" type="button">Visao geral</button>
-          <button class="view-tab" data-view-target="activeAppsView" type="button">Apps ativos</button>
-          <button class="view-tab" data-view-target="pendingAppsView" type="button">Pendencias</button>
+          <button class="view-tab" data-view-target="directAppsView" type="button">Links diretos</button>
+          <button class="view-tab" data-view-target="fullAppsView" type="button">Apps da FULL</button>
         </section>
 
         <section class="portal-view reveal" id="overviewView">
@@ -101,8 +101,8 @@
                   <dd>links ativos</dd>
                 </div>
                 <div>
-                  <dt id="pendingCount">0</dt>
-                  <dd>pendencias visiveis</dd>
+                  <dt id="fullCount">0</dt>
+                  <dd>rotas da full</dd>
                 </div>
                 <div>
                   <dt>1</dt>
@@ -123,40 +123,40 @@
                   <p>Resumo do portal e indicadores do ambiente de demonstracao.</p>
                 </article>
                 <article>
-                  <strong>Apps ativos</strong>
-                  <p>Lista somente os sistemas que ja possuem URL pronta para abrir.</p>
+                  <strong>Links diretos</strong>
+                  <p>Os sistemas acima de `[menuapps]` abrem na propria URL publicada.</p>
                 </article>
                 <article>
-                  <strong>Pendencias</strong>
-                  <p>Mostra os sistemas cadastrados que ainda precisam de link final.</p>
+                  <strong>Apps da FULL</strong>
+                  <p>Os sistemas de dentro da FULL abrem em rotas dedicadas do dominio Nanotech.</p>
                 </article>
               </div>
             </aside>
           </section>
         </section>
 
-        <section class="portal-view is-hidden" id="activeAppsView">
+        <section class="portal-view is-hidden" id="directAppsView">
           <section class="section-header">
             <div>
-              <span class="eyebrow">Apps ativos</span>
-              <h3>Sistemas publicados</h3>
+              <span class="eyebrow">Links diretos</span>
+              <h3>Sistemas externos publicados</h3>
             </div>
-            <p>Somente os acessos que ja podem ser abertos imediatamente.</p>
+            <p>Entradas acima de `[menuapps]` abrindo diretamente a URL configurada.</p>
           </section>
 
-          <section class="apps-grid" id="activeAppsGrid" aria-label="Lista de aplicativos ativos"></section>
+          <section class="apps-grid" id="directAppsGrid" aria-label="Lista de links diretos"></section>
         </section>
 
-        <section class="portal-view is-hidden" id="pendingAppsView">
+        <section class="portal-view is-hidden" id="fullAppsView">
           <section class="section-header">
             <div>
-              <span class="eyebrow">Pendencias</span>
-              <h3>Sistemas aguardando URL</h3>
+              <span class="eyebrow">Apps da FULL</span>
+              <h3>Rotas internas da Nanotech</h3>
             </div>
-            <p>Entradas cadastradas no portal que ainda nao possuem link final informado.</p>
+            <p>Entradas abaixo de `[menuapps]` abrindo em `nanotech-lvoz.onrender.com/<app>`.</p>
           </section>
 
-          <section class="apps-grid" id="pendingAppsGrid" aria-label="Lista de aplicativos pendentes"></section>
+          <section class="apps-grid" id="fullAppsGrid" aria-label="Lista de apps da full"></section>
         </section>
       </main>
     </div>
