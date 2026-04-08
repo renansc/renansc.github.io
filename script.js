@@ -30,7 +30,7 @@ const fallbackApps = [
     tipo: "direto",
     nome: "Zap Workflow",
     empresa: "ZAP Workflow",
-    href: "https://zap-workflow.onrender.com/"
+    href: "https://nanotech-lvoz.onrender.com/zap/"
   },
   {
     slug: "ris-bpa",

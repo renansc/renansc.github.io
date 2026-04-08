@@ -98,7 +98,7 @@ Os dados operacionais continuam usando tabelas dedicadas no backend:
 - `financeiro_purchase_requests`
 - `financeiro_reminder_logs`
 
-Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical`, `financeiro-nanotech` e `zap-workflow` no startup.
+Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical`, `financeiro-nanotech` e `zap-workflow` no startup. O atalho do Zap aponta para `https://nanotech-lvoz.onrender.com/zap/`.
 
 Quando o app roda com SQLite, os dados ficam em `data/app.db`.
 

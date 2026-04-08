@@ -76,7 +76,7 @@ DEFAULT_SITE_APPS = [
         "slug": "zap-workflow",
         "nome": "Zap Workflow",
         "descricao": "Atendimento, vendas e fluxo operacional do WhatsApp.",
-        "href": "https://zap-workflow.onrender.com/",
+        "href": "https://nanotech-lvoz.onrender.com/zap/",
     },
 ]
 
