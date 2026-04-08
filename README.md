@@ -3,7 +3,7 @@
 Portal com um menu principal protegido por senha, servido por backend Python com Flask, sem dependencia de Node:
 
 - `Site` (home do portal)
-- links externos para `CardioClin`, `Rio Branco`, `Nanotech` e `Laboratorio Santa Terezinha`
+- links externos para `CardioClin`, `Rio Branco`, `Zap Workflow`, `Nanotech` e `Laboratorio Santa Terezinha`
 - submenu da `Nanotech` para `Financeiro` e `GPS Musical`
 
 O frontend continua usando `localStorage` como cache, mas a persistencia principal fica no backend via `/api/stores/:storeId`.
@@ -98,7 +98,7 @@ Os dados operacionais continuam usando tabelas dedicadas no backend:
 - `financeiro_purchase_requests`
 - `financeiro_reminder_logs`
 
-Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical` e `financeiro-nanotech` no startup.
+Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical`, `financeiro-nanotech` e `zap-workflow` no startup.
 
 Quando o app roda com SQLite, os dados ficam em `data/app.db`.
 

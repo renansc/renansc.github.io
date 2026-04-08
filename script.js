@@ -26,6 +26,13 @@ const fallbackApps = [
     href: "https://206.62.65.68:80"
   },
   {
+    slug: "zap-workflow",
+    tipo: "direto",
+    nome: "Zap Workflow",
+    empresa: "ZAP Workflow",
+    href: "https://zap-workflow.onrender.com/"
+  },
+  {
     slug: "ris-bpa",
     tipo: "full",
     nome: "RIS+BPA",
