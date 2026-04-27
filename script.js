@@ -26,13 +26,6 @@ const fallbackApps = [
     href: "https://206.62.65.68:80"
   },
   {
-    slug: "zap-workflow",
-    tipo: "direto",
-    nome: "Zap Workflow",
-    empresa: "ZAP Workflow",
-    href: "https://nanotech-lvoz.onrender.com/zap/"
-  },
-  {
     slug: "ris-bpa",
     tipo: "full",
     nome: "RIS+BPA",
@@ -52,6 +45,20 @@ const fallbackApps = [
     nome: "gpsmusical",
     empresa: "srv/gpsmusical",
     href: "https://nanotech-lvoz.onrender.com/gpsmusical"
+  },
+  {
+    slug: "zap",
+    tipo: "full",
+    nome: "zap",
+    empresa: "srv/zap",
+    href: "https://nanotech-lvoz.onrender.com/zap/"
+  },
+  {
+    slug: "nanoponto",
+    tipo: "full",
+    nome: "NanoPonto",
+    empresa: "srv/NanoPonto",
+    href: "https://nanotech-lvoz.onrender.com/nanoponto/"
   }
 ];
 

@@ -73,10 +73,16 @@ DEFAULT_SITE_APPS = [
         "href": "prontuario-bpa.html",
     },
     {
-        "slug": "zap-workflow",
-        "nome": "Zap Workflow",
+        "slug": "zap",
+        "nome": "zap",
         "descricao": "Atendimento, vendas e fluxo operacional do WhatsApp.",
         "href": "https://nanotech-lvoz.onrender.com/zap/",
+    },
+    {
+        "slug": "nanoponto",
+        "nome": "NanoPonto",
+        "descricao": "Ponto eletronico / Controle de presenca.",
+        "href": "https://nanotech-lvoz.onrender.com/nanoponto/",
     },
 ]
 
