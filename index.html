@@ -3,165 +3,247 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Portal de App Nanotech</title>
+  <title>Nan 'o Tech | Soluções Tecnológicas Renan</title>
   <meta
     name="description"
-    content="Portal simples com senha de demonstracao para abrir os apps publicados no Render."
+    content="Nan 'o Tech cria sistemas, automações, sites, apps financeiros, GPS Musical, agendamentos, cursos e materiais para colocar tecnologia para rodar."
   />
+  <meta property="og:title" content="Nan 'o Tech | Soluções Tecnológicas Renan" />
+  <meta
+    property="og:description"
+    content="Soluções digitais, automações e apps publicados no Render para organizar rotina, dinheiro, agenda e conteúdo."
+  />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/hero-nanotech.png" />
+  <link rel="preload" href="assets/hero-nanotech.png" as="image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;700;800&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="page-shell">
-    <section class="auth-screen" id="authScreen">
-      <div class="auth-card card reveal">
-        <div class="auth-copy">
-          <span class="eyebrow">Acesso protegido</span>
-          <h1>Portal de App Nanotech</h1>
-          <p>
-            Entre com uma senha simples de demonstracao para liberar o menu central e abrir os apps publicados.
-          </p>
-          <ul class="auth-list">
-            <li>RIS+PACS - Laboratorio Santa Terezinha</li>
-            <li>RIS+CLN - Cardio Clin</li>
-            <li>Zap Workflow - atendimento e automacao</li>
-            <li>FULL - Nanotech</li>
-            <li>Site - Nanotech no GitHub</li>
-          </ul>
+  <header class="site-header" id="top">
+    <a class="brand-link" href="#top" aria-label="Nan 'o Tech">
+      <img src="logo.png" alt="Nanotech Criando Soluções" />
+    </a>
+
+    <nav class="desktop-nav" aria-label="Menu principal">
+      <a href="#solucoes">Soluções</a>
+      <a href="#trabalho">Trabalho</a>
+      <a href="#cursos">Cursos</a>
+      <a href="#contato">Contato</a>
+    </nav>
+
+    <div class="header-actions">
+      <a class="button button-small button-primary" href="https://nanotech-lvoz.onrender.com" target="_blank" rel="noreferrer">
+        Veja nosso trabalho
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteMenu">
+        <span class="screen-reader">Abrir menu</span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="menu-panel" id="siteMenu" hidden aria-label="Menu mobile">
+    <a href="#solucoes">Soluções</a>
+    <a href="#trabalho">Veja nosso trabalho</a>
+    <a href="#cursos">Cursos e materiais</a>
+    <a href="#contato">Contato</a>
+    <a href="https://nanotech-lvoz.onrender.com" target="_blank" rel="noreferrer">Deploy no Render</a>
+  </nav>
+
+  <main>
+    <section class="hero" aria-label="Apresentação da Nan 'o Tech">
+      <div class="hero-content reveal">
+        <p class="eyebrow">Nan 'o Tech / Soluções Tecnológicas Renan</p>
+        <h1>
+          Não é só um site.
+          <span>É operação rodando.</span>
+        </h1>
+        <p class="hero-text">
+          Sistemas, automações, dashboards e ferramentas sob medida para transformar links soltos em uma presença
+          digital clara, rápida e pronta para deploy.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://nanotech-lvoz.onrender.com" target="_blank" rel="noreferrer">
+            Veja nosso trabalho
+          </a>
+          <a class="button button-secondary" href="#contato">Fale com Renan</a>
         </div>
+      </div>
 
-        <form class="auth-form" id="loginForm">
-          <label class="field">
-            <span>Senha de demonstracao</span>
-            <input
-              id="passwordInput"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="Digite a senha"
-              required
-            />
-          </label>
-
-          <button class="primary-link auth-submit" id="passwordLoginButton" type="submit">Entrar no portal</button>
-          <p class="auth-hint">A autenticacao e local no navegador, apenas para demonstracao.</p>
-          <p class="auth-feedback" id="authFeedback" aria-live="polite"></p>
-        </form>
+      <div class="hero-strip" aria-label="Resumo dos serviços">
+        <span>Financeiro</span>
+        <span>GPSMusical</span>
+        <span>Agendamentos</span>
+        <span>Cursos</span>
+        <span>Materiais</span>
+        <span>Deploy Render</span>
       </div>
     </section>
 
-    <div class="portal-shell is-hidden" id="portalShell" hidden>
-      <header class="topbar">
-        <div class="brand">
-          <div class="logo">
-            <img src="logo.png" alt="Logo do portal" onerror="this.style.display='none'; this.parentElement.textContent='RS';" />
-          </div>
-          <div class="brand-copy">
-            <span class="eyebrow">Portal de sistemas</span>
-            <h1>Portal de App Nanotech</h1>
-            <p>Menu central para abrir rapidamente os sistemas hospedados no Render e no GitHub Pages.</p>
-          </div>
+    <section class="section section-paper" id="solucoes">
+      <div class="section-heading reveal">
+        <div>
+          <p class="eyebrow dark">Do Google Sites para uma vitrine profissional</p>
+          <h2>Tecnologia para quem precisa organizar, vender, atender e acompanhar tudo de perto.</h2>
         </div>
+        <p>
+          O conteúdo do site original virou uma experiência mais forte: serviços claros, contato direto e projetos
+          publicados em um único caminho.
+        </p>
+      </div>
 
-        <div class="topbar-actions">
-          <div class="status-pill" id="portalSummary">0 atalhos liberados</div>
-          <div class="session-actions">
-            <nav aria-label="Menu principal">
-              <ul class="menu" id="menuLinks"></ul>
-            </nav>
-            <button class="ghost-link logout-button" id="logoutButton" type="button">Sair</button>
-          </div>
+      <div class="solution-grid">
+        <article class="solution-card reveal" data-tone="cyan">
+          <span>01</span>
+          <h3>Financeiro</h3>
+          <p>Controle de lançamentos, contas, categorias, conciliação, anexos e compras em um fluxo mais organizado.</p>
+        </article>
+        <article class="solution-card reveal" data-tone="magenta">
+          <span>02</span>
+          <h3>GPSMusical</h3>
+          <p>Repertório, letras, blocos musicais e apoio para ensaios, apresentações e organização de conteúdo.</p>
+        </article>
+        <article class="solution-card reveal" data-tone="lime">
+          <span>03</span>
+          <h3>Agendamentos</h3>
+          <p>Rotinas de atendimento, presença, acompanhamento e gestão de agenda para reduzir trabalho manual.</p>
+        </article>
+        <article class="solution-card reveal" data-tone="amber">
+          <span>04</span>
+          <h3>Sites e sistemas</h3>
+          <p>Landing pages, portais, APIs, bancos de dados e integrações preparadas para GitHub e Render.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="statement-section">
+      <div class="statement-content reveal">
+        <p class="eyebrow">Menos improviso, mais entrega</p>
+        <h2>
+          O que era <span class="strike">link solto</span> vira uma plataforma com cara, contexto e ação.
+        </h2>
+      </div>
+      <div class="statement-rail" aria-hidden="true">
+        <span>backend</span>
+        <span>frontend</span>
+        <span>automação</span>
+        <span>deploy</span>
+        <span>dados</span>
+        <span>suporte</span>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="trabalho">
+      <div class="work-heading reveal">
+        <div>
+          <p class="eyebrow">Veja nosso trabalho</p>
+          <h2>Projetos publicados e sistemas em operação.</h2>
         </div>
-      </header>
+        <a class="button button-light" href="https://nanotech-lvoz.onrender.com" target="_blank" rel="noreferrer">
+          Abrir deploy no Render
+        </a>
+      </div>
 
-      <main class="container">
-        <section class="view-switcher card reveal" aria-label="Views do portal">
-          <button class="view-tab is-active" data-view-target="overviewView" type="button">Visao geral</button>
-          <button class="view-tab" data-view-target="directAppsView" type="button">Links diretos</button>
-          <button class="view-tab" data-view-target="fullAppsView" type="button">Apps da FULL</button>
-        </section>
+      <div class="work-summary reveal">
+        <span id="workCount">Carregando projetos</span>
+        <span>Render, GitHub Pages e links diretos</span>
+      </div>
 
-        <section class="portal-view reveal" id="overviewView">
-          <section class="hero hero-compact">
-            <article class="hero-copy card">
-              <span class="eyebrow">Painel principal</span>
-              <h2>Um portal central com views separadas para navegar sem rolagem excessiva.</h2>
-              <p>
-                Depois do login, o portal mostra secoes internas para visao geral, apps ativos e pendencias, deixando
-                a consulta mais rapida e organizada.
-              </p>
+      <div class="project-grid" id="projectsGrid" aria-live="polite"></div>
+    </section>
 
-              <dl class="hero-stats">
-                <div>
-                  <dt id="appCount">0</dt>
-                  <dd>links ativos</dd>
-                </div>
-                <div>
-                  <dt id="fullCount">0</dt>
-                  <dd>rotas da full</dd>
-                </div>
-                <div>
-                  <dt>1</dt>
-                  <dd>portal de demonstracao</dd>
-                </div>
-              </dl>
-            </article>
+    <section class="section section-paper split-section" id="cursos">
+      <div class="split-copy reveal">
+        <p class="eyebrow dark">Cursos e materiais</p>
+        <h2>Conteúdo prático para aprender fazendo.</h2>
+        <p>
+          A área de cursos foi reorganizada como trilhas simples: terminal, Git, Windows, Linux, redes, automações e
+          publicação de apps. O foco é documentação útil e rotina real de suporte.
+        </p>
+      </div>
+      <div class="course-list reveal">
+        <article>
+          <span>Terminal</span>
+          <strong>Comandos essenciais para manutenção, diagnóstico e organização de arquivos.</strong>
+        </article>
+        <article>
+          <span>Git e deploy</span>
+          <strong>Versionamento, GitHub, Render, variáveis de ambiente e publicação segura.</strong>
+        </article>
+        <article>
+          <span>Materiais</span>
+          <strong>Apostilas, referências, checklists e exemplos para consulta rápida.</strong>
+        </article>
+      </div>
+    </section>
 
-            <aside class="hero-panel card">
-              <div class="panel-head">
-                <span class="eyebrow">Resumo rapido</span>
-                <div class="panel-badge">Login + views</div>
-              </div>
+    <section class="contact-section" id="contato">
+      <div class="contact-copy reveal">
+        <p class="eyebrow">Contato</p>
+        <h2>Vamos colocar sua ideia para funcionar?</h2>
+        <p>
+          Fale pelo WhatsApp, e-mail ou redes sociais. O atendimento começa pelo problema real e termina com algo que
+          pode ser usado.
+        </p>
+      </div>
 
-              <div class="signal-grid">
-                <article>
-                  <strong>Visao geral</strong>
-                  <p>Resumo do portal e indicadores do ambiente de demonstracao.</p>
-                </article>
-                <article>
-                  <strong>Links diretos</strong>
-                  <p>Os sistemas acima de `[menuapps]` abrem na propria URL publicada.</p>
-                </article>
-                <article>
-                  <strong>Apps da FULL</strong>
-                  <p>Os sistemas de dentro da FULL abrem em rotas dedicadas do dominio Nanotech.</p>
-                </article>
-              </div>
-            </aside>
-          </section>
-        </section>
+      <div class="contact-grid reveal">
+        <a class="contact-card" href="https://api.whatsapp.com/send?phone=5544997185175&text=Contato%20Pelo%20Google%20Sites" target="_blank" rel="noreferrer">
+          <span>WA</span>
+          <strong>WhatsApp</strong>
+          <small>44 99718-5175</small>
+        </a>
+        <a class="contact-card" href="mailto:solucoestecnologicasrenan@gmail.com">
+          <span>@</span>
+          <strong>E-mail</strong>
+          <small>solucoestecnologicasrenan@gmail.com</small>
+        </a>
+        <a class="contact-card" href="https://t.me/Renan_Santos" target="_blank" rel="noreferrer">
+          <span>TG</span>
+          <strong>Telegram</strong>
+          <small>@Renan_Santos</small>
+        </a>
+        <a class="contact-card" href="https://www.linkedin.com/in/renan-santos-coutinho-812865a3/" target="_blank" rel="noreferrer">
+          <span>IN</span>
+          <strong>LinkedIn</strong>
+          <small>Renan Santos Coutinho</small>
+        </a>
+        <a class="contact-card" href="https://github.com/renansc?tab=repositories" target="_blank" rel="noreferrer">
+          <span>GH</span>
+          <strong>GitHub</strong>
+          <small>renansc</small>
+        </a>
+        <a class="contact-card" href="https://www.instagram.com/renansc1988/" target="_blank" rel="noreferrer">
+          <span>IG</span>
+          <strong>Instagram</strong>
+          <small>@renansc1988</small>
+        </a>
+        <a class="contact-card" href="https://www.facebook.com/renan.santoscoutinho.35/" target="_blank" rel="noreferrer">
+          <span>FB</span>
+          <strong>Facebook</strong>
+          <small>renan.santoscoutinho.35</small>
+        </a>
+        <a class="contact-card" href="https://www.youtube.com/channel/UCf3v3RG-D69wr-7ULrUVE5w" target="_blank" rel="noreferrer">
+          <span>YT</span>
+          <strong>YouTube</strong>
+          <small>Canal Nan 'o Tech</small>
+        </a>
+      </div>
+    </section>
+  </main>
 
-        <section class="portal-view is-hidden" id="directAppsView">
-          <section class="section-header">
-            <div>
-              <span class="eyebrow">Links diretos</span>
-              <h3>Sistemas externos publicados</h3>
-            </div>
-            <p>Entradas acima de `[menuapps]` abrindo diretamente a URL configurada.</p>
-          </section>
-
-          <section class="apps-grid" id="directAppsGrid" aria-label="Lista de links diretos"></section>
-        </section>
-
-        <section class="portal-view is-hidden" id="fullAppsView">
-          <section class="section-header">
-            <div>
-              <span class="eyebrow">Apps da FULL</span>
-              <h3>Rotas internas da Nanotech</h3>
-            </div>
-            <p>Entradas abaixo de `[menuapps]` abrindo em `nanotech-lvoz.onrender.com/<app>`.</p>
-          </section>
-
-          <section class="apps-grid" id="fullAppsGrid" aria-label="Lista de apps da full"></section>
-        </section>
-      </main>
-    </div>
-  </div>
+  <footer class="site-footer">
+    <span>Nan 'o Tech</span>
+    <span>Criando soluções para web, automação e sistemas sob medida.</span>
+  </footer>
 
   <script src="script.js"></script>
 </body>

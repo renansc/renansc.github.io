@@ -1,160 +1,91 @@
-# Portal Renan SC
+# Nan 'o Tech
 
-Portal com um menu principal protegido por senha, servido por backend Python com Flask, sem dependencia de Node:
+Site institucional da Nan 'o Tech / Soluções Tecnológicas Renan, criado para substituir o Google Sites por uma página pública mais forte, com:
 
-- `Site` (home do portal)
-- links externos para `CardioClin`, `Rio Branco`, `Zap Workflow`, `Nanotech` e `Laboratorio Santa Terezinha`
-- submenu da `Nanotech` para `Financeiro` e `GPS Musical`
+- apresentação dos serviços: Financeiro, GPSMusical, Agendamentos, Sites e Sistemas
+- botão **Veja nosso trabalho** apontando para o deploy no Render
+- vitrine dinâmica dos projetos listados em `menuapps.txt`
+- contatos: WhatsApp, e-mail, Telegram, LinkedIn, GitHub, Instagram, Facebook e YouTube
+- backend Flask preservado para APIs, persistência e integrações existentes
 
-O frontend continua usando `localStorage` como cache, mas a persistencia principal fica no backend via `/api/stores/:storeId`.
+## Preview local
 
-## Como rodar
+Para revisar só o site estático:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+python3 -m http.server 8000
+```
+
+Acesse:
+
+```text
+http://127.0.0.1:8000
+```
+
+Para rodar com o Flask:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
 ```
 
-No Linux/WSL, ative o ambiente com:
+A aplicação Flask sobe em:
 
-```bash
-source .venv/bin/activate
+```text
+http://127.0.0.1:5000
 ```
 
-A aplicacao sobe em `http://localhost:5000`.
+No Windows, ative o ambiente com:
 
-## Autenticacao do portal
+```bash
+.venv\Scripts\activate
+```
 
-O portal usa sessao Flask para liberar o menu principal.
+## Deploy
 
-Opcao 1, senha simples:
+O deploy no Render usa o arquivo `render.yaml`.
 
-- Configure `PORTAL_PASSWORD` no `.env` ou no provedor de deploy
-- Configure `FLASK_SECRET_KEY` para persistir a sessao com seguranca
+Fluxo sugerido:
 
-Opcao 2, entrar com GitHub via OAuth:
+```bash
+git add .
+git commit -m "Cria site institucional Nanotech"
+git push
+```
 
-- Crie um OAuth App no GitHub
-- Configure `GITHUB_OAUTH_CLIENT_ID`
-- Configure `GITHUB_OAUTH_CLIENT_SECRET`
-- Configure `GITHUB_OAUTH_CALLBACK_URL`
-- Opcionalmente configure `GITHUB_ALLOWED_USERS` com logins separados por virgula
+Depois, conecte o repositório no Render ou use o Blueprint do `render.yaml`.
 
-Exemplo de callback:
+Link principal usado no site:
 
-- `https://SEU-DOMINIO/auth/github/callback`
+```text
+https://nanotech-lvoz.onrender.com
+```
 
-Se `PORTAL_PASSWORD` e as variaveis GitHub estiverem vazias, o portal entra sem exigir login.
+## Projetos exibidos
 
-## Integracao BPA
+A seção **Veja nosso trabalho** lê `menuapps.txt` no navegador. Os links abaixo de `[menuapps]` são tratados como rotas da Nanotech no Render, e os demais como links diretos.
 
-O backend do portal continua expondo `/api/bpa/...` como proxy para o servico Firebird/BPA.
+Se `menuapps.txt` não carregar, o `script.js` usa uma lista de fallback com os principais projetos.
 
-- Ajuste `BPA_API_BASE_URL` no `.env` se o servico estiver em outro host/porta
-- O servico BPA esperado agora pode ser mantido separado do site, em `api-firebird`
+## Backend
 
-## Configuracao do banco
+O backend Flask ainda expõe APIs e integrações já existentes:
 
-As variaveis de ambiente ficam em `.env`.
+- `/api/stores/:storeId`
+- `/api/bpa/...`
+- rotas de autenticação opcionais
+- persistência em SQLite, PostgreSQL ou MySQL via SQLAlchemy
+- recursos do Financeiro, GPSMusical e BPA
 
-Configuracao local padrao:
+Variáveis úteis para produção:
 
-- `DB_PROVIDER=sqlite`
-- `DB_NAME=data/app.db`
+- `FLASK_SECRET_KEY`
+- `DATABASE_URL`
+- `DB_PROVIDER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `BPA_API_BASE_URL`
+- `FINANCE_ATTACHMENTS_DIR`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`
 
-Se quiser usar um banco externo, preencha `DATABASE_URL` ou informe:
-
-- `DB_PROVIDER=postgres` ou `DB_PROVIDER=mysql`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-
-Exemplos de `DATABASE_URL`:
-
-- `postgresql+psycopg://usuario:senha@host:5432/nome_do_banco`
-- `mysql+pymysql://usuario:senha@host:3306/nome_do_banco`
-
-## Persistencia
-
-Os dados operacionais continuam usando tabelas dedicadas no backend:
-
-- `site_apps`
-- `gps_songs`
-- `gps_song_tags`
-- `gps_song_blocks`
-- `financeiro_config`
-- `financeiro_accounts`
-- `financeiro_categories`
-- `financeiro_transactions`
-- `financeiro_imports`
-- `financeiro_bank_transactions`
-- `financeiro_reconciliations`
-- `financeiro_titles`
-- `financeiro_title_attachments`
-- `financeiro_purchase_requests`
-- `financeiro_reminder_logs`
-
-Se existir uma tabela antiga `app_stores`, o backend tenta migrar automaticamente os dados de `gps-musical`, `financeiro-nanotech` e `zap-workflow` no startup. O atalho do Zap aponta para `https://nanotech-lvoz.onrender.com/zap/`.
-
-Quando o app roda com SQLite, os dados ficam em `data/app.db`.
-
-## Anexos do financeiro
-
-Os anexos de contas a pagar/receber sao enviados para a pasta `dados/` por padrao.
-
-- Use `FINANCE_ATTACHMENTS_DIR` para trocar o destino dos arquivos.
-- Se quiser aproveitar uma pasta sincronizada do Google Drive, aponte `FINANCE_ATTACHMENTS_DIR` para esse diretorio montado/sincronizado.
-- Os arquivos sao organizados em subpastas `YYYY-MM` conforme o vencimento.
-- A leitura de QR Code, codigo de barras e linha digitavel roda no Flask/Python via `Pillow` + `pyzbar` + `PyMuPDF`.
-- Em Linux/WSL e em deploy, instale tambem a biblioteca nativa `libzbar0`.
-
-## Compras e aprovacao
-
-O financeiro agora inclui a aba de solicitacoes de compra:
-
-- cadastra produto/servico, fornecedor, link do produto, foto por URL, justificativa, conta, categoria, vencimento e forma de pagamento
-- a solicitacao fica `PENDENTE` ate aprovacao
-- ao aprovar, o sistema gera automaticamente o titulo em `Contas a Pagar`
-- alteracoes posteriores na solicitacao mantem o AP vinculado atualizado
-
-### Pesquisa I.A de compras
-
-O modal de compras agora inclui o botao `Pesquisa I.A`, que usa um motor Python de scraping para consultar a web e devolver links organizados por:
-
-- melhor preco
-- custo-beneficio
-- alternativas
-
-Configuracoes opcionais do scraper no servidor:
-
-- `FINANCE_SCRAPER_DOMAINS` com uma lista separada por virgula dos dominios permitidos
-- `FINANCE_SCRAPER_TIMEOUT_SECONDS`
-- `FINANCE_RESEARCH_MAX_OFFERS`
-- `FINANCE_SCRAPER_USER_AGENT`
-
-Observacoes:
-
-- a pesquisa prioriza lojas brasileiras e valores em BRL
-- o scraping e executado no Flask/Python
-- os links retornados podem ser usados para preencher fornecedor, URL do produto e valor estimado na solicitacao
-
-## Avisos por e-mail
-
-Os lembretes usam SMTP configurado no servidor.
-
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USER`
-- `SMTP_PASSWORD`
-- `SMTP_USE_TLS` ou `SMTP_USE_SSL`
-- `FINANCE_REMINDER_TO`
-- `FINANCE_REMINDER_FROM`
-- `FINANCE_REMINDER_LOOKAHEAD_DAYS`
-
-Para producao, configure `DATABASE_URL` apontando para PostgreSQL ou MySQL, ou use um disco persistente se optar por SQLite.
-
-Observacao: o `GPSMusical` continua mantendo os blobs de audio em `IndexedDB` no navegador. O catalogo das musicas vai para o servidor, mas os MP3 precisam ser reenviados em cada dispositivo.
+Quando usar SQLite, os dados ficam em `data/app.db`. Para produção, prefira `DATABASE_URL` com PostgreSQL ou MySQL, ou configure disco persistente no Render.
