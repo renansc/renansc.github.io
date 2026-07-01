@@ -1,11 +1,19 @@
 APP		EMPRESA			EMAIL						URL
-RIS+PACS	LAB.STA TEREZINHA	imagemsterezinha@gmail.com			https://rispacsfull.onrender.com/
-RIS+CLN		CARDIO CLIN								https://cardioclin.onrender.com/
-CRM+VOIP+CAM	RIO BRANCO								https://206.62.65.68:80
 
 [menuapps]
-RIS+BPA		srv/api-firebird							https://nanotech-lvoz.onrender.com/bpa
-financeiro	srv/financeiro		solucoestecnologicasrenan@gmail.com		https://nanotech-lvoz.onrender.com/financeiro
-gpsmusical 	srv/gpsmusical		solucoestecnologicasrenan@gmail.com		https://nanotech-lvoz.onrender.com/gpsmusical
-zap		srv/zap			renanrocks2009@gmail.com			https://nanotech-lvoz.onrender.com/zap/
-NanoPonto	srv/NanoPonto		renanrocks2009@gmail.com			https://nanotech-lvoz.onrender.com/nanoponto/
+Automacao	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/automacao/original/
+Financeiro	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/financeiro/original
+NanoPonto	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/nanoponto/original
+Zap		NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/zap/original
+NanoStore	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/nanostore/original
+GPS Musical	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/gpsmusical/original
+BPA		NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/bpa/original
+Tatoo		NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/tatoo/original
+RioB		NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob
+Cameras RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-cameras/riob
+Telefonia RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-telefonia/riob
+Chat IA RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-chat-ia/riob
+Chat RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-chat/riob
+E-mail RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-email/riob
+ESXi RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-esxi/riob
+Importar XML RioB	NanotechSoft	filesystem	https://nanotechsoft.onrender.com/apps/riob-xml/riob

@@ -472,7 +472,8 @@ function renderProjects(projects) {
   const normalized = projects.length ? projects : fallbackProjects;
 
   if (workCount) {
-    workCount.textContent = "Veja alguns projetos nossos";
+    const fullCount = normalized.filter((project) => project.tipo === "full").length;
+    workCount.textContent = `${normalized.length} apps, ${fullCount} links diretos no OnRender`;
   }
 
   if (!projectGrid) return;
