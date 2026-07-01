@@ -160,27 +160,30 @@
       <div class="project-grid" id="projectsGrid" aria-live="polite"></div>
     </section>
 
-    <section class="section section-paper split-section" id="cursos">
-      <div class="split-copy reveal">
-        <p class="eyebrow dark">Cursos e materiais</p>
-        <h2>Conteúdo prático para aprender fazendo.</h2>
+    <section class="section section-paper course-section" id="cursos">
+      <div class="course-intro reveal">
+        <div>
+          <p class="eyebrow dark">Cursos e materiais</p>
+          <h2>Primeiro módulo: LPT1 / LPIC-1, Bash e terminal Linux.</h2>
+        </div>
         <p>
-          A área de cursos foi reorganizada como trilhas simples: terminal, Git, Windows, Linux, redes, automações e
-          publicação de apps. O foco é documentação útil e rotina real de suporte.
+          Uma trilha prática para estudar comandos em subgrupos, com foco em reconhecimento, uso diário e preparação
+          para rotinas de suporte, automação e administração Linux.
         </p>
       </div>
-      <div class="course-list reveal">
-        <article>
-          <span>Terminal</span>
-          <strong>Comandos essenciais para manutenção, diagnóstico e organização de arquivos.</strong>
-        </article>
-        <article>
-          <span>Git e deploy</span>
-          <strong>Versionamento, GitHub, Render, variáveis de ambiente e publicação segura.</strong>
-        </article>
-        <article>
-          <span>Materiais</span>
-          <strong>Apostilas, referências, checklists e exemplos para consulta rápida.</strong>
+
+      <div class="course-shell reveal">
+        <aside class="course-map">
+          <span class="course-badge">LPIC-1 / Bash</span>
+          <h3>Subgrupos de estudo</h3>
+          <p>Escolha uma área e revise os comandos essenciais junto com o objetivo de cada grupo.</p>
+          <div class="course-tabs" id="courseTabs" role="tablist" aria-label="Subgrupos do curso LPIC-1"></div>
+        </aside>
+
+        <article class="course-panel" id="coursePanel" aria-live="polite">
+          <span class="course-badge">Carregando</span>
+          <h3>Preparando conteúdo do curso</h3>
+          <p>Os subgrupos aparecem aqui automaticamente.</p>
         </article>
       </div>
     </section>
