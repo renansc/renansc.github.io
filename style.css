@@ -714,9 +714,53 @@ button {
   line-height: 1.65;
 }
 
+.course-module-tabs,
 .course-tabs {
   display: grid;
   gap: 8px;
+}
+
+.course-module-tabs {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-light);
+}
+
+.course-module-tab {
+  min-height: 70px;
+  display: grid;
+  gap: 7px;
+  align-content: center;
+  padding: 12px;
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: rgba(5, 5, 5, 0.04);
+  text-align: left;
+  font-weight: 900;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.course-module-tab span {
+  color: var(--magenta);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.course-module-tab:hover,
+.course-module-tab:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 61, 165, 0.38);
+  outline: none;
+}
+
+.course-module-tab.is-active {
+  color: var(--paper);
+  border-color: transparent;
+  background: var(--ink);
+}
+
+.course-module-tab.is-active span {
+  color: var(--lime);
 }
 
 .course-tab {
@@ -986,6 +1030,7 @@ button {
     position: static;
   }
 
+  .course-module-tabs,
   .course-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1055,6 +1100,7 @@ button {
 
   .solution-grid,
   .project-grid,
+  .course-module-tabs,
   .course-tabs,
   .command-grid,
   .contact-grid {

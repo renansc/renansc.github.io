@@ -216,12 +216,99 @@ const courseGroups = [
   }
 ];
 
+const courseModules = [
+  {
+    id: "lpic-bash",
+    number: "01",
+    badge: "LPIC-1 / Bash",
+    title: "LPIC-1, Bash e terminal Linux",
+    mapTitle: "Subgrupos LPIC-1",
+    mapText: "Escolha uma área e revise os comandos essenciais para terminal Linux, automação e suporte.",
+    groups: courseGroups
+  },
+  {
+    id: "uteis-velocidade",
+    number: "02",
+    badge: "Windows / Velocidade",
+    title: "Comandos úteis, velocidade e manutenção",
+    mapTitle: "Subgrupos Windows e rede",
+    mapText: "Diagnóstico de disco, desempenho, reparo do sistema, licença legítima e testes de portas.",
+    groups: [
+      {
+        id: "win-velocidade",
+        number: "02.1",
+        title: "Velocidade e score de disco",
+        summary: "Comandos para medir desempenho de disco e localizar o relatório WinSAT do Windows.",
+        commands: [
+          ["winsat disk -drive c", "Executa teste de desempenho do disco C: pelo Windows System Assessment Tool."],
+          ["C:\\Windows\\Performance\\WinSAT\\DataStore", "Pasta onde ficam os relatórios XML do WinSAT."],
+          ["Score WinSAT", "Procure o resultado no XML; normalmente a escala aparece de 1,0 a 9,9."]
+        ]
+      },
+      {
+        id: "win-disco",
+        number: "02.2",
+        title: "Saúde e reparo de disco",
+        summary: "Verificações rápidas para status físico e correção de erros no sistema de arquivos.",
+        commands: [
+          ["wmic diskdrive get status", "Mostra o status SMART resumido dos discos reconhecidos pelo Windows."],
+          ["chkdsk c: /f /r /x", "Agenda correção de erros, busca setores defeituosos e desmonta o volume quando possível."],
+          ["PowerShell como administrador", "Use estes comandos em terminal elevado e faça backup antes de reparos demorados."]
+        ]
+      },
+      {
+        id: "win-sistema",
+        number: "02.3",
+        title: "Integridade do Windows",
+        summary: "Comandos para reparar arquivos do sistema e investigar problemas após travamentos ou lentidão.",
+        commands: [
+          ["sfc /scannow", "Verifica e repara arquivos protegidos do Windows."],
+          ["DISM /Online /Cleanup-Image /RestoreHealth", "Repara a imagem do Windows usada pelo SFC quando há corrupção."],
+          ["reiniciar e testar", "Após reparos, reinicie e valide desempenho, disco e serviços afetados."]
+        ]
+      },
+      {
+        id: "win-licenca",
+        number: "02.4",
+        title: "Licença Windows e Office",
+        summary: "Consulta de status e chave original. Ativação deve usar chave válida, conta Microsoft ou contrato oficial.",
+        commands: [
+          ["slmgr /dli", "Mostra informações básicas da licença do Windows."],
+          ["slmgr /dlv", "Mostra informações detalhadas da licença do Windows."],
+          ["slmgr /ipk XXXXX-XXXXX-XXXXX-XXXXX-XXXXX", "Instala uma chave de produto válida do Windows."],
+          ["slmgr /ato", "Solicita ativação online após instalar uma chave válida."],
+          ["wmic path softwareLicensingService get OA3xOriginalProductKey", "Localiza chave OEM gravada na BIOS/UEFI, quando existir."],
+          ["Windows: Configurações > Sistema > Ativação", "Caminho seguro para licença digital vinculada ao hardware ou conta Microsoft."],
+          ["Office: Arquivo > Conta", "Local seguro para verificar status de ativação do Microsoft Office."]
+        ]
+      },
+      {
+        id: "rede-portas",
+        number: "02.5",
+        title: "Teste de portas pelo Bash",
+        summary: "Teste simples de conectividade TCP usando nmap em Linux, WSL ou ambiente com Bash.",
+        commands: [
+          ["nmap -sT -p porta ip", "Testa conexão TCP em uma porta específica de um IP."],
+          ["nmap -sT -p 3389 192.168.0.10", "Exemplo para testar RDP em um host da rede local."],
+          ["autorização primeiro", "Execute varreduras apenas em redes e equipamentos que você administra ou tem permissão para testar."]
+        ]
+      }
+    ]
+  }
+];
+
 const menuToggle = document.querySelector(".menu-toggle");
 const menuPanel = document.getElementById("siteMenu");
 const projectGrid = document.getElementById("projectsGrid");
 const workCount = document.getElementById("workCount");
+const courseModuleTabs = document.getElementById("courseModuleTabs");
+const courseModuleBadge = document.getElementById("courseModuleBadge");
+const courseMapTitle = document.getElementById("courseMapTitle");
+const courseMapText = document.getElementById("courseMapText");
 const courseTabs = document.getElementById("courseTabs");
 const coursePanel = document.getElementById("coursePanel");
+
+let activeCourseModuleId = courseModules[0]?.id;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -351,7 +438,8 @@ async function loadProjects() {
 function renderCourseGroup(groupId) {
   if (!coursePanel) return;
 
-  const group = courseGroups.find((item) => item.id === groupId) || courseGroups[0];
+  const activeModule = courseModules.find((module) => module.id === activeCourseModuleId) || courseModules[0];
+  const group = activeModule?.groups.find((item) => item.id === groupId) || activeModule?.groups[0];
   if (!group) return;
 
   const commandCards = group.commands
@@ -377,7 +465,8 @@ function renderCourseGroup(groupId) {
 }
 
 function setActiveCourse(groupId) {
-  const activeGroup = courseGroups.find((group) => group.id === groupId) || courseGroups[0];
+  const activeModule = courseModules.find((module) => module.id === activeCourseModuleId) || courseModules[0];
+  const activeGroup = activeModule?.groups.find((group) => group.id === groupId) || activeModule?.groups[0];
   if (!activeGroup) return;
 
   courseTabs?.querySelectorAll("[data-course-target]").forEach((button) => {
@@ -392,7 +481,22 @@ function setActiveCourse(groupId) {
 function renderCourseTabs() {
   if (!courseTabs) return;
 
-  courseTabs.innerHTML = courseGroups
+  const activeModule = courseModules.find((module) => module.id === activeCourseModuleId) || courseModules[0];
+  const groups = activeModule?.groups || [];
+
+  if (courseModuleBadge && activeModule) {
+    courseModuleBadge.textContent = activeModule.badge;
+  }
+
+  if (courseMapTitle && activeModule) {
+    courseMapTitle.textContent = activeModule.mapTitle;
+  }
+
+  if (courseMapText && activeModule) {
+    courseMapText.textContent = activeModule.mapText;
+  }
+
+  courseTabs.innerHTML = groups
     .map((group, index) => {
       const active = index === 0;
 
@@ -411,7 +515,50 @@ function renderCourseTabs() {
     })
     .join("");
 
-  setActiveCourse(courseGroups[0]?.id);
+  setActiveCourse(groups[0]?.id);
+}
+
+function setActiveModule(moduleId) {
+  const activeModule = courseModules.find((module) => module.id === moduleId) || courseModules[0];
+  if (!activeModule) return;
+
+  activeCourseModuleId = activeModule.id;
+
+  courseModuleTabs?.querySelectorAll("[data-course-module]").forEach((button) => {
+    const isActive = button.dataset.courseModule === activeModule.id;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  renderCourseTabs();
+}
+
+function renderCourseModules() {
+  if (!courseModuleTabs) {
+    renderCourseTabs();
+    return;
+  }
+
+  courseModuleTabs.innerHTML = courseModules
+    .map((module, index) => {
+      const active = index === 0;
+
+      return `
+        <button
+          class="course-module-tab${active ? " is-active" : ""}"
+          type="button"
+          role="tab"
+          aria-selected="${active}"
+          data-course-module="${escapeHtml(module.id)}"
+        >
+          <span>Módulo ${escapeHtml(module.number)}</span>
+          ${escapeHtml(module.title)}
+        </button>
+      `;
+    })
+    .join("");
+
+  setActiveModule(courseModules[0]?.id);
 }
 
 function setMenuOpen(open) {
@@ -435,6 +582,12 @@ courseTabs?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-course-target]");
   if (!(button instanceof HTMLButtonElement)) return;
   setActiveCourse(button.dataset.courseTarget);
+});
+
+courseModuleTabs?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-course-module]");
+  if (!(button instanceof HTMLButtonElement)) return;
+  setActiveModule(button.dataset.courseModule);
 });
 
 document.addEventListener("keydown", (event) => {
@@ -473,6 +626,6 @@ function observeReveals() {
   });
 }
 
-renderCourseTabs();
+renderCourseModules();
 observeReveals();
 loadProjects();
