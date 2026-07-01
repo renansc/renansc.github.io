@@ -5,7 +5,7 @@ Site institucional da Nan 'o Tech / Soluções Tecnológicas, criado para substi
 - apresentação dos serviços: Automação, Portais internos, Workflows, Dados e Integrações
 - botão **Veja nosso trabalho** apontando para o deploy no Render
 - vitrine dinâmica dos projetos listados em `menuapps.txt`
-- contatos: WhatsApp, e-mail, Telegram, LinkedIn, GitHub, Instagram, Facebook e YouTube
+- contatos: WhatsApp, e-mail, Telegram, Instagram, Facebook e YouTube
 - backend Flask preservado para APIs, persistência e integrações existentes
 
 ## Preview local
