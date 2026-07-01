@@ -1,6 +1,6 @@
 # Nan 'o Tech
 
-Site institucional da Nan 'o Tech / Soluções Tecnológicas Renan, criado para substituir o Google Sites por uma página pública mais forte, com:
+Site institucional da Nan 'o Tech / Soluções Tecnológicas, criado para substituir o Google Sites por uma página pública mais forte, com:
 
 - apresentação dos serviços: Automação, Portais internos, Workflows, Dados e Integrações
 - botão **Veja nosso trabalho** apontando para o deploy no Render
