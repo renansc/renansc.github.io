@@ -1,54 +1,139 @@
-const RENDER_BASE_URL = "https://nanotech-lvoz.onrender.com";
+const RENDER_BASE_URL = "https://nanotechsoft.onrender.com";
 const MENU_APPS_FILE = "menuapps.txt";
 
 const fallbackProjects = [
   {
-    nome: "RIS+PACS",
-    empresa: "LAB.STA TEREZINHA",
-    href: "https://rispacsfull.onrender.com/",
-    tipo: "direto"
-  },
-  {
-    nome: "RIS+CLN",
-    empresa: "CARDIO CLIN",
-    href: "https://cardioclin.onrender.com/",
-    tipo: "direto"
+    nome: "Automacao",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/automacao/original/`,
+    tipo: "full"
   },
   {
     nome: "Financeiro",
-    empresa: "srv/financeiro",
-    href: `${RENDER_BASE_URL}/financeiro`,
-    tipo: "full"
-  },
-  {
-    nome: "GPSMusical",
-    empresa: "srv/gpsmusical",
-    href: `${RENDER_BASE_URL}/gpsmusical`,
-    tipo: "full"
-  },
-  {
-    nome: "Zap",
-    empresa: "srv/zap",
-    href: `${RENDER_BASE_URL}/zap/`,
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/financeiro/original`,
     tipo: "full"
   },
   {
     nome: "NanoPonto",
-    empresa: "srv/NanoPonto",
-    href: `${RENDER_BASE_URL}/nanoponto/`,
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/nanoponto/original`,
+    tipo: "full"
+  },
+  {
+    nome: "Zap",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/zap/original`,
+    tipo: "full"
+  },
+  {
+    nome: "NanoStore",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/nanostore/original`,
+    tipo: "full"
+  },
+  {
+    nome: "GPS Musical",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/gpsmusical/original`,
+    tipo: "full"
+  },
+  {
+    nome: "BPA",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/bpa/original`,
+    tipo: "full"
+  },
+  {
+    nome: "Tatoo",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/tatoo/original`,
+    tipo: "full"
+  },
+  {
+    nome: "RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "Cameras RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-cameras/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "Telefonia RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-telefonia/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "Chat IA RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-chat-ia/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "Chat RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-chat/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "E-mail RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-email/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "ESXi RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-esxi/riob`,
+    tipo: "full"
+  },
+  {
+    nome: "Importar XML RioB",
+    empresa: "NanotechSoft",
+    origem: "filesystem",
+    href: `${RENDER_BASE_URL}/apps/riob-xml/riob`,
     tipo: "full"
   }
 ];
 
 const descriptions = {
-  "ris-pacs": "Ambiente de imagem e fluxo RIS/PACS para laboratório.",
-  "ris-cln": "Sistema clínico para atendimento, agenda e rotina operacional.",
-  "crm-voip-cam": "Integração de atendimento, telefonia, CRM e câmera.",
-  "ris-bpa": "Rota interna para prontuário, atendimentos e BPA.",
-  financeiro: "Controle financeiro com contas, categorias, compras e conciliação.",
-  gpsmusical: "Organização de repertório, músicas, letras e blocos.",
-  zap: "Fluxo de atendimento e automação para WhatsApp.",
-  nanoponto: "Controle de presença e registro de ponto eletrônico."
+  automacao: "Monitoramento industrial e sensores importado do sensoresMonitor.",
+  financeiro: "Gestao financeira Nanotech integrada ao NanotechSoft com dados em MySQL.",
+  "gps-musical": "Repertorio musical com biblioteca, editor, audio local, YouTube, Spotify e backup JSON.",
+  gpsmusical: "Repertorio musical com biblioteca, editor, audio local, YouTube, Spotify e backup JSON.",
+  zap: "Atendimento WhatsApp com kanban, agenda, etiquetas e configuracoes de integracao.",
+  nanoponto: "Registro de ponto REP-P, banco de horas, justificativas e relatórios fiscais.",
+  nanostore: "ERP de farmácia com estoque, compras, vendas e financeiro.",
+  bpa: "Prontuario ambulatorial e explorador de tabelas BPA.",
+  tatoo: "Gestao de estudio com clientes, agenda, consentimentos, financeiro e assinatura digital.",
+  riob: "Aplicacao RioB completa integrada como backend operacional.",
+  "cameras-riob": "Painel de cameras e cadastro de streams do RioB.",
+  "telefonia-riob": "Configuracao SIP/WebRTC, FreePBX e chamadas pelo chat RioB.",
+  "chat-ia-riob": "Agent IA e conversa assistida por IA do RioB.",
+  "chat-riob": "Chat convencional interno do RioB com anexos e contatos.",
+  "e-mail-riob": "Gestor de e-mails e anexos legado do RioB.",
+  "esxi-riob": "Cliente ESXi/vSphere integrado pelo RioB.",
+  "importar-xml-riob": "Importador XML de estoque e abastecimentos do RioB."
 };
 
 const accents = ["cyan", "magenta", "lime", "amber"];
@@ -355,6 +440,7 @@ function parseMenuApps(text) {
     projects.push({
       nome: columns[0],
       empresa: columns[1] || "",
+      origem: columns.length > 3 ? columns[columns.length - 2] : "",
       href,
       tipo: section
     });
@@ -364,6 +450,7 @@ function parseMenuApps(text) {
 }
 
 function projectMeta(project) {
+  if (project.href.includes("nanotechsoft.onrender.com")) return "OnRender / app";
   if (project.tipo === "full") return "Render / rota interna";
   if (project.href.includes("onrender.com")) return "Deploy Render";
   return "Link direto";
@@ -386,7 +473,7 @@ function renderProjects(projects) {
 
   if (workCount) {
     const fullCount = normalized.filter((project) => project.tipo === "full").length;
-    workCount.textContent = `${normalized.length} projetos, ${fullCount} rotas no Render`;
+    workCount.textContent = `${normalized.length} apps, ${fullCount} links diretos no OnRender`;
   }
 
   if (!projectGrid) return;
@@ -395,7 +482,7 @@ function renderProjects(projects) {
     .map((project, index) => {
       const accent = accents[index % accents.length];
       const nome = escapeHtml(project.nome);
-      const empresa = escapeHtml(project.empresa);
+      const origem = escapeHtml(project.origem || project.empresa);
       const href = escapeHtml(project.href);
       const meta = escapeHtml(projectMeta(project));
       const descricao = escapeHtml(projectDescription(project));
@@ -412,7 +499,7 @@ function renderProjects(projects) {
             <p>${descricao}</p>
           </div>
           <div class="project-footer">
-            <small>${empresa}</small>
+            <small>${origem}</small>
             <a href="${href}" target="_blank" rel="noreferrer">Abrir</a>
           </div>
         </article>

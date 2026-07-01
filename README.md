@@ -2,7 +2,7 @@
 
 Site institucional da Nan 'o Tech / Soluções Tecnológicas Renan, criado para substituir o Google Sites por uma página pública mais forte, com:
 
-- apresentação dos serviços: Financeiro, GPSMusical, Agendamentos, Sites e Sistemas
+- apresentação dos serviços: Automação, Portais internos, Workflows, Dados e Integrações
 - botão **Veja nosso trabalho** apontando para o deploy no Render
 - vitrine dinâmica dos projetos listados em `menuapps.txt`
 - contatos: WhatsApp, e-mail, Telegram, LinkedIn, GitHub, Instagram, Facebook e YouTube
@@ -60,12 +60,12 @@ Depois, conecte o repositório no Render ou use o Blueprint do `render.yaml`.
 Link principal usado no site:
 
 ```text
-https://nanotech-lvoz.onrender.com
+https://nanotechsoft.onrender.com
 ```
 
 ## Projetos exibidos
 
-A seção **Veja nosso trabalho** lê `menuapps.txt` no navegador. Os links abaixo de `[menuapps]` são tratados como rotas da Nanotech no Render, e os demais como links diretos.
+A seção **Veja nosso trabalho** lê `menuapps.txt` no navegador. Os links abaixo de `[menuapps]` apontam para os apps publicados no NanotechSoft.
 
 Se `menuapps.txt` não carregar, o `script.js` usa uma lista de fallback com os principais projetos.
 
