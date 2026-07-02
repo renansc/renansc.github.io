@@ -242,7 +242,7 @@ button {
   background:
     linear-gradient(90deg, rgba(5, 5, 5, 0.96) 0%, rgba(5, 5, 5, 0.8) 34%, rgba(5, 5, 5, 0.3) 64%, rgba(5, 5, 5, 0.52) 100%),
     linear-gradient(180deg, rgba(5, 5, 5, 0.28), rgba(5, 5, 5, 0.88)),
-    url("assets/hero-nanotech.png") center right / cover no-repeat;
+    var(--ink);
 }
 
 .hero::after {

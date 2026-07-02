@@ -1,5 +1,4 @@
 const RENDER_BASE_URL = "https://nanotechsoft.onrender.com";
-const MENU_APPS_FILE = "menuapps.txt";
 
 const fallbackProjects = [
   {
@@ -510,15 +509,7 @@ function renderProjects(projects) {
 }
 
 async function loadProjects() {
-  try {
-    const response = await fetch(MENU_APPS_FILE, { cache: "no-store" });
-    if (!response.ok) throw new Error("menuapps indisponível");
-
-    const projects = parseMenuApps(await response.text());
-    renderProjects(projects);
-  } catch (error) {
-    renderProjects(fallbackProjects);
-  }
+  renderProjects(fallbackProjects);
 }
 
 function renderCourseGroup(groupId) {
