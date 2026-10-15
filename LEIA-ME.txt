@@ -1,0 +1,1 @@
+Versão 7: layout 3D restaurado da versão de teste v6, com referência à logo.png original do GitHub. Os arquivos de comandos e LPIC-1 foram mantidos. Para testar fora do GitHub Pages, copie logo.png do repositório para esta pasta e use um servidor HTTP local.
