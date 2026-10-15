@@ -13,8 +13,8 @@
   "sections": [],
   "links": [
     {
-      "label": "NanotechSoft-Cifras — Repositório",
-      "url": "https://github.com/renansc/Cifras"
+      "label": "NanotechSoft-Cifras — Abrir aplicativo",
+      "url": "https://renansc.github.io/Cifras/"
     }
   ]
 }
