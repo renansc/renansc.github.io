@@ -8,12 +8,12 @@ const data=[{tag:'01 / IDENTIDADE',title:'Nan ’o Tech',text:'Soluções inteli
 ];
 data.push({tag:'07 / COMANDOS',title:'Comandos úteis',text:'Biblioteca de comandos por categoria, com pesquisa e cópia rápida.',glyph:'>_',colors:['#174c45','#0b1d20','#5df5cf66'],link:'#'});
 details.push({heading:'Comandos úteis',intro:'Biblioteca de comandos técnicos por categoria.',sections:[]});
-data.push({tag:'08 / LINUX',title:'LPIC-1',text:'Comandos Linux organizados por grupos.',glyph:'>_',colors:['#184d45','#091e20','#52ffd066'],link:'#'});
-details.push({heading:'LPIC-1',intro:'Biblioteca Linux',categories:[],links:[]});
-data.push({tag:'09 / LINKS',title:'Links Tools',text:'Atalhos para ferramentas, aplicativos e sites úteis.',glyph:'↗',colors:['#204b39','#0c211a','#b8ff5666'],link:'#'});
+data.push({tag:'08 / LINKS',title:'Links Tools',text:'Atalhos para ferramentas, aplicativos e sites úteis.',glyph:'↗',colors:['#204b39','#0c211a','#b8ff5666'],link:'#'});
 details.push({heading:'Links Tools',intro:'Acesse rapidamente os sistemas e ferramentas reunidos pela Nan ’o Tech.',sections:[],links:[{label:'NanotechSoft-Cifras — abrir projeto',url:'https://github.com/renansc/Cifras'}]});
+data.push({tag:'09 / LINUX',title:'LPIC-1',text:'Comandos Linux organizados por grupos.',glyph:'>_',colors:['#184d45','#091e20','#52ffd066'],link:'#'});
+details.push({heading:'LPIC-1',intro:'Biblioteca Linux',categories:[],links:[]});
 const fallbackData = data.map((card,i)=>({...card, ...details[i]}));
-const cardFiles = ['empresa','automacao','sistemas','dados','infraestrutura','contatos','comandos-uteis','lpic1','links-tools'];
+const cardFiles = ['empresa','automacao','sistemas','dados','infraestrutura','contatos','comandos-uteis','links-tools','lpic1'];
 function safeText(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function safeHref(value){const v=String(value||'');return /^(https?:\/\/|mailto:|tel:)/i.test(v)?v:'#';}
 async function loadContent(){
