@@ -1,5 +1,5 @@
 {
-  "tag": "08 / LINUX",
+  "tag": "09 / LINUX",
   "title": "LPIC-1",
   "text": "Comandos Linux por categoria",
   "heading": "LPIC-1 — Comandos e fundamentos",
