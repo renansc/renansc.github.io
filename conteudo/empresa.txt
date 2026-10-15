@@ -1,0 +1,17 @@
+{
+  "tag": "01",
+  "title": "Nan 'o Tech",
+  "text": "Soluções tecnológicas para empresas",
+  "heading": "Nan 'o Tech",
+  "intro": "Tecnologia aplicada a desafios reais",
+  "sections": [
+    [
+      "Sobre nós",
+      "Sistemas web, automação, redes e integrações."
+    ],
+    [
+      "Atuação",
+      "Projetos sob medida desde a análise até a implantação."
+    ]
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "tag": "03",
+  "title": "Sistemas sob medida",
+  "text": "Software e portais personalizados",
+  "heading": "Sistemas sob medida",
+  "intro": "Soluções digitais para diferentes necessidades",
+  "sections": [
+    [
+      "Aplicações",
+      "Sistemas web, dashboards e ferramentas de gestão."
+    ]
+  ]
+}

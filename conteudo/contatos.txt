@@ -1,0 +1,51 @@
+{
+  "tag": "06",
+  "title": "Contato",
+  "text": "WhatsApp, e-mail e redes sociais",
+  "heading": "Contato",
+  "intro": "Escolha o canal mais conveniente",
+  "sections": [
+    [
+      "WhatsApp",
+      "(44) 99718-5175"
+    ],
+    [
+      "E-mail",
+      "solucoestecnologicasrenan@gmail.com"
+    ],
+    [
+      "Instagram",
+      "@nan_o_tech"
+    ],
+    [
+      "Telegram",
+      "@Renan_Santos"
+    ]
+  ],
+  "links": [
+    {
+      "label": "WhatsApp",
+      "url": "https://api.whatsapp.com/send?phone=5544997185175"
+    },
+    {
+      "label": "E-mail",
+      "url": "mailto:solucoestecnologicasrenan@gmail.com"
+    },
+    {
+      "label": "Instagram",
+      "url": "https://www.instagram.com/nan_o_tech/"
+    },
+    {
+      "label": "Telegram",
+      "url": "https://t.me/Renan_Santos"
+    },
+    {
+      "label": "Facebook",
+      "url": "https://www.facebook.com/renansolucoes/"
+    },
+    {
+      "label": "YouTube",
+      "url": "https://www.youtube.com/channel/UCf3v3RG-D69wr-7ULrUVE5w"
+    }
+  ]
+}

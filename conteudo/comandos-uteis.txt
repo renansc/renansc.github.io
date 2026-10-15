@@ -1,0 +1,60 @@
+{
+  "tag": "07 / REFERÊNCIA",
+  "title": "Comandos úteis",
+  "text": "Diagnóstico Windows, redes e licenças",
+  "heading": "Comandos úteis",
+  "intro": "Comandos técnicos agrupados por finalidade.",
+  "categories": [
+    {
+      "name": "Teste e diagnóstico",
+      "commands": [
+        {
+          "name": "Velocidade do disco",
+          "command": "winsat disk -drive c"
+        },
+        {
+          "name": "Resultados WinSAT",
+          "command": "C:\\Windows\\Performance\\WinSAT\\DataStore"
+        },
+        {
+          "name": "Estado do disco",
+          "command": "wmic diskdrive get status"
+        },
+        {
+          "name": "Verificar disco",
+          "command": "chkdsk c: /f /r /x"
+        },
+        {
+          "name": "Arquivos do Windows",
+          "command": "sfc /scannow"
+        }
+      ]
+    },
+    {
+      "name": "Licenças — consulta",
+      "commands": [
+        {
+          "name": "Status da licença",
+          "command": "slmgr /dli"
+        },
+        {
+          "name": "Detalhes da licença",
+          "command": "slmgr /dlv"
+        },
+        {
+          "name": "Chave OEM",
+          "command": "wmic path softwareLicensingService get OA3xOriginalProductKey"
+        }
+      ]
+    },
+    {
+      "name": "Redes",
+      "commands": [
+        {
+          "name": "Testar porta TCP",
+          "command": "nmap -sT -p 80 192.168.1.1"
+        }
+      ]
+    }
+  ]
+}

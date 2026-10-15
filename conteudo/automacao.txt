@@ -1,0 +1,17 @@
+{
+  "tag": "02",
+  "title": "Automação industrial",
+  "text": "Sensores, monitoramento e integração",
+  "heading": "Automação industrial",
+  "intro": "Tecnologia para processos industriais",
+  "sections": [
+    [
+      "Monitoramento",
+      "Temperatura, vibração, velocidade e indicadores operacionais."
+    ],
+    [
+      "Integração",
+      "Painéis e comunicação com equipamentos."
+    ]
+  ]
+}

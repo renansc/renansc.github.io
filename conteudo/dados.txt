@@ -1,0 +1,17 @@
+{
+  "tag": "04",
+  "title": "Inteligência e dados",
+  "text": "Relatórios e indicadores",
+  "heading": "Inteligência e dados",
+  "intro": "Informação para apoiar decisões",
+  "sections": [
+    [
+      "Dashboards",
+      "Indicadores de desempenho e comparativos."
+    ],
+    [
+      "Integrações",
+      "APIs, importações e bancos de dados."
+    ]
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "tag": "05",
+  "title": "Redes e infraestrutura",
+  "text": "Servidores, conectividade e suporte",
+  "heading": "Redes e infraestrutura",
+  "intro": "Ambientes organizados e conectados",
+  "sections": [
+    [
+      "Servidores",
+      "Linux, containers e serviços internos."
+    ],
+    [
+      "Redes",
+      "Segmentação, conectividade e acesso remoto."
+    ]
+  ]
+}

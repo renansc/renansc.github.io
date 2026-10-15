@@ -1,0 +1,579 @@
+{
+  "tag": "08 / LINUX",
+  "title": "LPIC-1",
+  "text": "Comandos Linux por categoria",
+  "heading": "LPIC-1 — Comandos e fundamentos",
+  "intro": "Biblioteca para consulta e estudo dos comandos Linux.",
+  "categories": [
+    {
+      "name": "Shell e ambiente",
+      "commands": [
+        {
+          "name": "bash",
+          "command": "bash",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "type",
+          "command": "type",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "alias",
+          "command": "alias",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "chsh",
+          "command": "chsh",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "&&",
+          "command": "&&",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "||",
+          "command": "||",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "echo",
+          "command": "echo",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "env",
+          "command": "env",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "set",
+          "command": "set",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "unset",
+          "command": "unset",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "export",
+          "command": "export",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "uname",
+          "command": "uname",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "pwd",
+          "command": "pwd",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "man",
+          "command": "man",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "whatis",
+          "command": "whatis",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "apropos",
+          "command": "apropos",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "whereis",
+          "command": "whereis",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "quoting",
+          "command": "quoting",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Texto e filtros",
+      "commands": [
+        {
+          "name": "cat",
+          "command": "cat",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "wc",
+          "command": "wc",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "nl",
+          "command": "nl",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "sort",
+          "command": "sort",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "less",
+          "command": "less",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "head",
+          "command": "head",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "tail",
+          "command": "tail",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "uniq",
+          "command": "uniq",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "od",
+          "command": "od",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "split",
+          "command": "split",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "paste",
+          "command": "paste",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "md5sum",
+          "command": "md5sum",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "sha256sum",
+          "command": "sha256sum",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "sha512sum",
+          "command": "sha512sum",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "tr",
+          "command": "tr",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "cut",
+          "command": "cut",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "bzcat",
+          "command": "bzcat",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "xzcat",
+          "command": "xzcat",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "zcat",
+          "command": "zcat",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "grep",
+          "command": "grep",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "egrep",
+          "command": "egrep",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "fgrep",
+          "command": "fgrep",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Arquivos e diretórios",
+      "commands": [
+        {
+          "name": "cd",
+          "command": "cd",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "ls",
+          "command": "ls",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "file",
+          "command": "file",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "touch",
+          "command": "touch",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "cp",
+          "command": "cp",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "mv",
+          "command": "mv",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "mkdir",
+          "command": "mkdir",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "rm",
+          "command": "rm",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "rmdir",
+          "command": "rmdir",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "find",
+          "command": "find",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Compactação e backup",
+      "commands": [
+        {
+          "name": "tar",
+          "command": "tar",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "gzip",
+          "command": "gzip",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "gunzip",
+          "command": "gunzip",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "bzip2",
+          "command": "bzip2",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "bunzip2",
+          "command": "bunzip2",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "xz",
+          "command": "xz",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "unxz",
+          "command": "unxz",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "cpio",
+          "command": "cpio",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "dd",
+          "command": "dd",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Redirecionamento e pipes",
+      "commands": [
+        {
+          "name": "<",
+          "command": "<",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": ">",
+          "command": ">",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "2>",
+          "command": "2>",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "|",
+          "command": "|",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "&",
+          "command": "&",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "xargs",
+          "command": "xargs",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "tee",
+          "command": "tee",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Processos e tarefas",
+      "commands": [
+        {
+          "name": "ps",
+          "command": "ps",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "pstree",
+          "command": "pstree",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "top",
+          "command": "top",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "pgrep",
+          "command": "pgrep",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "pidof",
+          "command": "pidof",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "kill",
+          "command": "kill",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "pkill",
+          "command": "pkill",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "killall",
+          "command": "killall",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "bg",
+          "command": "bg",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "fg",
+          "command": "fg",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "jobs",
+          "command": "jobs",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "nohup",
+          "command": "nohup",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "free",
+          "command": "free",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "uptime",
+          "command": "uptime",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "screen",
+          "command": "screen",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "watch",
+          "command": "watch",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "nice",
+          "command": "nice",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "renice",
+          "command": "renice",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Terminal e editores",
+      "commands": [
+        {
+          "name": "tmux",
+          "command": "tmux",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "tmux ls",
+          "command": "tmux ls",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "tmux attach -t 0",
+          "command": "tmux attach -t 0",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "Ctrl+B W",
+          "command": "Ctrl+B W",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "Ctrl+B D",
+          "command": "Ctrl+B D",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "w",
+          "command": "w",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "vi",
+          "command": "vi",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "nano",
+          "command": "nano",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "emacs",
+          "command": "emacs",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "export EDITOR=vi",
+          "command": "export EDITOR=vi",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    },
+    {
+      "name": "Sistema e hardware",
+      "commands": [
+        {
+          "name": "/proc",
+          "command": "/proc",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "/sys",
+          "command": "/sys",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "/dev",
+          "command": "/dev",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "DMA",
+          "command": "DMA",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "IRQ",
+          "command": "IRQ",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "I/O",
+          "command": "I/O",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "SCSI",
+          "command": "SCSI",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "lspci",
+          "command": "lspci",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "lsusb",
+          "command": "lsusb",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "lsmod",
+          "command": "lsmod",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "lspci -s 02:00.0 -v",
+          "command": "lspci -s 02:00.0 -v",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        },
+        {
+          "name": "lsusb -t",
+          "command": "lsusb -t",
+          "description": "Comando ou conceito para estudo; consulte man e --help quando aplicável."
+        }
+      ]
+    }
+  ]
+}
