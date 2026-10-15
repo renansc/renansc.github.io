@@ -14,7 +14,7 @@
   "links": [
     {
       "label": "NanotechSoft-Cifras — Abrir aplicativo",
-      "url": "https://renansc.github.io/Cifras/"
+      "url": "https://renansc.github.io/Cifras/saida/NanotechSoft-Cifras.html"
     }
   ]
 }
