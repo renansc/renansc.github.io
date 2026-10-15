@@ -1,0 +1,20 @@
+{
+  "tag": "09 / LINKS",
+  "title": "Links Tools",
+  "heading": "Links Tools",
+  "text": "Sites, aplicativos e ferramentas em um único lugar.",
+  "glyph": "↗",
+  "colors": [
+    "#204b39",
+    "#0c211a",
+    "#b8ff5666"
+  ],
+  "intro": "Biblioteca de links para os projetos Nan ’o Tech. Clique em um item para abrir em outra aba.",
+  "sections": [],
+  "links": [
+    {
+      "label": "NanotechSoft-Cifras — Repositório",
+      "url": "https://github.com/renansc/Cifras"
+    }
+  ]
+}
